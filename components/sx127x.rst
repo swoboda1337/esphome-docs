@@ -44,7 +44,8 @@ Configuration variables:
 - **frequency** (**Required**, int): Frequency in Hz of the transceiver.
 - **modulation** (**Required**, enum): Modulation can be ``OOK`` or ``FSK``.
 - **payload_length** (**Optional**, int): If set to a length greater than zero packet mode is enabled, otherwise continuous mode is used. In packet mode, packets are received with the on_packet trigger and sent via the send_packet automation. In continuous mode raw data appears on dio2 and is handled by remote receiver / transmitter.
-- **bitrate** (**Optional**, int): Bitrate of the signal. Required by packet mode and recommended in continuous mode, example 4800.
+- **bitrate** (**Optional**, int): Bit rate of the signal. Required by packet mode and recommended in continuous mode, example 4800.
+- **bitsync** (**Optional**, bool): Enables the rx bit syncronizer.
 - **sync_value** (**Optional**, list): Synchronization bytes found after the preamble and before the payload. Required by packet mode.
 - **preamble_size** (**Optional**, int): Length of the preamble in bytes. Preamble detector is disabled if the size is 0.
 - **preamble_polarity** (**Optional**, int): Polarity of the preamble, either 0xAA or 0x55.
@@ -55,7 +56,7 @@ Configuration variables:
 - **rx_duration** (**Optional**, int or :ref:`config-time`): Requires DIO0 and DIO2 to be configured in continuous mode. The FSK demodulator unlike OOK cannot be gated by signal strength. In order to reduce noise DIO2 can be automatically gated until the receiver is triggered by either rssi or a preamble detection. Once triggered DIO2 is ungated temporarily for rx_duration and then the receiver is restarted.
 - **pa_pin** (**Optional**, enum): Transmitter output, can be ``BOOST`` or ``RFO``.
 - **pa_power** (**Optional**, int): Transmitter power, range is 0 to 17 dBm.
-- **shaping** (**Optional**, enum): Transmitter data shaping, valid values for OOK are ``CUTOFF_BR_X_2``, ``CUTOFF_BR_X_1`` or ``NONE``, valid values for FSK are ``GAUSSIAN_BT_0_3``, ``GAUSSIAN_BT_0_5``, ``GAUSSIAN_BT_1_0`` or ``NONE``. Note only recommended in packet mode as the data has to be synchronized with the data clock.
+- **shaping** (**Optional**, enum): Transmitter data shaping, valid values for OOK are ``CUTOFF_BR_X_2``, ``CUTOFF_BR_X_1`` or ``NONE``, valid values for FSK are ``GAUSSIAN_BT_0_3``, ``GAUSSIAN_BT_0_5``, ``GAUSSIAN_BT_1_0`` or ``NONE``. Note only recommended in packet mode, in continuous mode the data on DIO2 must to be synchronized with the bit clock on DIO1.
 - **fsk_fdev** (**Optional**, int): Transmitter frequency deviation, valid values range from 0 to 100,000 Hz.
 - **fsk_ramp** (**Optional**, enum): Transmitter PA ramp, valid values are ``10us``, ``12us``, ``15us``, ``20us``, ``25us``, ``31us``, ``40us``, ``50us``, ``62us``, ``100us``, ``125us``, ``250us``, ``500us``, ``1000us``, ``2000us`` or ``3400us``.
 
@@ -109,7 +110,7 @@ This :ref:`action <config-action>` sets the SX127X mode to standby. If DIO2 is c
 
 ``sx127x.send_packet`` **Action**
 
-This :ref:`action <config-action>` sends a packet, SX127X needs to be in packet mode.
+This :ref:`action <config-action>` sends a packet, the SX127X needs to be in packet mode.
 
 .. code-block:: yaml
 
@@ -190,7 +191,6 @@ The radio expects raw data to be sent on a GPIO, typically :doc:`remote_transmit
 
     # Example configuration entry
     sx127x:
-      id: sx127x_id
       nss_pin: GPIO18
       rst_pin: GPIO23
       frequency: 433920000
@@ -227,7 +227,6 @@ The radio can be used as both a transmitter and receiver. The same GPIO is used 
 
     # Example configuration entry
     sx127x:
-      id: sx127x_id
       nss_pin: GPIO18
       rst_pin: GPIO23
       dio2:
