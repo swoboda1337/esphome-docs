@@ -43,7 +43,7 @@ Configuration variables:
 - **dio2_pin** (**Optional**, :ref:`Pin Schema <config-pin_schema>`): Digital IO pin 2.
 - **frequency** (**Required**, int): Frequency in Hz of the transceiver.
 - **modulation** (**Required**, enum): Modulation can be ``OOK`` or ``FSK``.
-- **payload_length** (**Optional**, int): If set to a length greater than zero packet mode is enabled, otherwise continuous mode is used. In packet mode, packets are received with the on_packet trigger and sent via the send_packet automation. In continuous mode raw data appears on dio2 and is handled by remote receiver / transmitter.
+- **payload_length** (**Optional**, int): If set to a length greater than zero packet mode is enabled, otherwise continuous mode is used. In packet mode, packets are received with the on_packet trigger and sent via the send_packet automation. In continuous mode raw data appears on DIO2 and is handled by remote receiver / transmitter.
 - **bitrate** (**Optional**, int): Bit rate of the signal. Required by packet mode and recommended in continuous mode, example 4800.
 - **bitsync** (**Optional**, bool): Enables the rx bit syncronizer.
 - **sync_value** (**Optional**, list): Synchronization bytes found after the preamble and before the payload. Required by packet mode.
@@ -221,7 +221,7 @@ The radio expects raw data to be sent on a GPIO, typically :doc:`remote_transmit
 
 **As a Transmitter & Receiver:**
 
-The radio can be used as both a transmitter and receiver. The same GPIO is used for both rx and tx. In order to make things work the gpio mode and radio mode must be set appropriately. The gpio mode will automatically be set if dio2 is configured.
+The radio can be used as both a transmitter and receiver. The same GPIO is used for both rx and tx. In order to make things work the gpio mode and radio mode must be set appropriately. The gpio mode will automatically be set if DIO2 is configured.
 
 .. code-block:: yaml
 
