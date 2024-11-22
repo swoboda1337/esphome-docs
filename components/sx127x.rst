@@ -47,13 +47,13 @@ Configuration variables:
 - **bitrate** (**Optional**, int): Bit rate of the signal. Required by packet mode and recommended in continuous mode, example 4800.
 - **bitsync** (**Optional**, bool): Enables the rx bit syncronizer.
 - **sync_value** (**Optional**, list): Synchronization bytes found after the preamble and before the payload. Required by packet mode.
-- **preamble_size** (**Optional**, int): Length of the preamble in bytes. Preamble detector is disabled if the size is 0.
+- **preamble_size** (**Optional**, int): Length of the preamble in bytes. Preamble detector is disabled if the size is 0. Required by packet mode.
 - **preamble_polarity** (**Optional**, int): Polarity of the preamble, either 0xAA or 0x55.
 - **preamble_errors** (**Optional**, int): Number of chip errors tolerated over the preamble, 4 chips per bit.
 - **rx_start** (**Optional**, bool): Start the receiver on boot or after transmit.
 - **rx_bandwidth** (**Optional**, enum): Receive bandwidth can be ``2_6kHz``, ``3_1kHz``, ``3_9kHz``, ``5_2kHz``, ``6_3kHz``, ``7_8kHz``, ``10_4kHz``, ``12_5kHz``, ``15_6kHz``, ``20_8kHz``, ``25_0kHz``, ``31_3kHz``, ``41_7kHz``, ``50_0kHz``, ``62_5kHz``, ``83_3kHz``, ``100_0kHz``, ``125_0kHz``, ``166_7kHz``, ``200_0kHz`` or ``250_0kHz``.
-- **rx_floor** (**Optional**, float): When receiving FSK in continuous mode, without a preamble configured, rx_floor is used to trigger the receiver. When receiving OOK data rx_floor should be set appropriately for your environment / device / antenna. If the floor is set too high (ie closer to 0) the radio will ignore everything. If the floor is set too low (ie closer to -128) noise will overwhelm remote receiver. A good starting point is -90 dBm.
-- **rx_duration** (**Optional**, int or :ref:`config-time`): Requires DIO0 and DIO2 to be configured in continuous mode. The FSK demodulator unlike OOK cannot be gated by signal strength. In order to reduce noise DIO2 can be automatically gated until the receiver is triggered by either rssi or a preamble detection. Once triggered DIO2 is ungated temporarily for rx_duration and then the receiver is restarted.
+- **rx_floor** (**Optional**, float): When receiving FSK in continuous mode, without a preamble configured, rx_floor is used to trigger the receiver. When receiving OOK in continuous mode rx_floor should be set appropriately for your environment / device / antenna. If the floor is set too high (ie closer to 0) the radio will ignore everything. If the floor is set too low (ie closer to -128) noise will overwhelm remote receiver. A good starting point is -90 dBm.
+- **rx_duration** (**Optional**, int or :ref:`config-time`): Requires DIO0 and DIO2 to be configured in continuous mode. The FSK demodulator unlike OOK cannot be gated by signal strength. In order to reduce noise DIO2 can be automatically gated until the receiver is triggered by either rssi or a preamble detection. Once triggered DIO2 is ungated temporarily for ``rx_duration``. It is recommended to use ``rx_duration`` for debug only and instead use packet mode for FSK.
 - **pa_pin** (**Optional**, enum): Transmitter output, can be ``BOOST`` or ``RFO``.
 - **pa_power** (**Optional**, int): Transmitter power, range is 0 to 17 dBm.
 - **shaping** (**Optional**, enum): Transmitter data shaping, valid values for OOK are ``CUTOFF_BR_X_2``, ``CUTOFF_BR_X_1`` or ``NONE``, valid values for FSK are ``GAUSSIAN_BT_0_3``, ``GAUSSIAN_BT_0_5``, ``GAUSSIAN_BT_1_0`` or ``NONE``. Note only recommended in packet mode, in continuous mode the data on DIO2 must to be synchronized with the bit clock on DIO1.
@@ -83,7 +83,7 @@ Actions:
 
 ``sx127x.set_mode_tx`` **Action**
 
-This :ref:`action <config-action>` sets the SX127X mode to tx. SX127X needs to be in continuous mode. If DIO2 is configured the pin mode will be set appropriately.
+This :ref:`action <config-action>` sets the ``sx127x`` mode to tx, ``sx127x`` needs to be in continuous mode. If DIO2 is configured the pin mode will be set appropriately.
 
 .. code-block:: yaml
 
@@ -92,7 +92,7 @@ This :ref:`action <config-action>` sets the SX127X mode to tx. SX127X needs to b
 
 ``sx127x.set_mode_rx`` **Action**
 
-This :ref:`action <config-action>` sets the SX127X mode to rx. If DIO2 is configured the pin mode will be set appropriately.
+This :ref:`action <config-action>` sets the ``sx127x`` mode to rx. If DIO2 is configured the pin mode will be set appropriately.
 
 .. code-block:: yaml
 
@@ -101,7 +101,7 @@ This :ref:`action <config-action>` sets the SX127X mode to rx. If DIO2 is config
 
 ``sx127x.set_mode_standby`` **Action**
 
-This :ref:`action <config-action>` sets the SX127X mode to standby. If DIO2 is configured the pin mode will be set appropriately.
+This :ref:`action <config-action>` sets the ``sx127x`` mode to standby. If DIO2 is configured the pin mode will be set appropriately.
 
 .. code-block:: yaml
 
@@ -110,7 +110,7 @@ This :ref:`action <config-action>` sets the SX127X mode to standby. If DIO2 is c
 
 ``sx127x.send_packet`` **Action**
 
-This :ref:`action <config-action>` sends a packet, the SX127X needs to be in packet mode.
+This :ref:`action <config-action>` sends a packet, the ``sx127x`` needs to be in packet mode.
 
 .. code-block:: yaml
 
@@ -161,7 +161,7 @@ Continuous Mode:
 
 **As a Receiver:**
 
-The radio will output demodulated data onto a GPIO, typically :doc:`remote_receiver </components/remote_receiver>` is used to handle this. Remote Receiver can either decode the signal itself or pass the raw data to another component (or lambda).
+The radio will output demodulated data onto DIO2, typically :doc:`remote_receiver </components/remote_receiver>` is used to handle this. Remote Receiver can either decode the signal itself or pass the raw data to another component (or lambda).
 
 .. code-block:: yaml
 
@@ -181,11 +181,11 @@ The radio will output demodulated data onto a GPIO, typically :doc:`remote_recei
 
 .. note::
 
-    The GPIO used by remote receiver must be DIO2 not DIO0.
+    The pin used by remote receiver must be DIO2 not DIO0.
 
 **As a Transmitter:**
 
-The radio expects raw data to be sent on a GPIO, typically :doc:`remote_transmitter </components/remote_transmitter>` is used to handle this. The radio transmitter must be enabled before transmit and disabled after. Ideally this is done using the remote transmitter triggers on_transmit and on_complete.
+The radio expects raw data to be sent on DIO2, typically :doc:`remote_transmitter </components/remote_transmitter>` is used to handle this. The radio transmitter must be enabled before transmit and disabled after. Ideally this is done using the remote transmitter triggers on_transmit and on_complete.
 
 .. code-block:: yaml
 
@@ -217,11 +217,11 @@ The radio expects raw data to be sent on a GPIO, typically :doc:`remote_transmit
 
 .. note::
 
-    The GPIO used by remote transmitter must be DIO2 not DIO0.
+    The pin used by remote transmitter must be DIO2 not DIO0.
 
 **As a Transmitter & Receiver:**
 
-The radio can be used as both a transmitter and receiver. The same GPIO is used for both rx and tx. In order to make things work the gpio mode and radio mode must be set appropriately. The gpio mode will automatically be set if DIO2 is configured.
+The radio can be used as both a transmitter and receiver. The same pin is used for both rx and tx. In order to make things work the gpio mode and radio mode must be set appropriately. The gpio mode will automatically be set if DIO2 is configured.
 
 .. code-block:: yaml
 
