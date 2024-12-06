@@ -136,6 +136,7 @@ In packet mode the radio can be used as both a transmitter and receiver. Mode ch
       rst_pin: GPIO23
       pa_pin: BOOST
       pa_power: 17
+      bitsync: true
       bitrate: 4800
       frequency: 433920000
       modulation: FSK
