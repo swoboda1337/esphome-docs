@@ -6,7 +6,10 @@ SX1276/7/8/9 Component
     :image: sx127x.jpg
 
 The ``sx127x`` component allows you to configure the SX1276, SX1277, SX1278 and SX1279 transceivers
-(`datasheet <https://www.semtech.com/products/wireless-rf/lora-connect/sx1278#documentation>`__) in ESPHome. Transceivers are connected via the :ref:`SPI Bus <spi>`. Supported frequencies range from 137 MHz to 1020 MHz. Supported modulations include OOK, FSK, GFSK, MSK and GMSK. The LoRa modem is not supported by this component, only the FSK/OOK modem.
+(`datasheet <https://www.semtech.com/products/wireless-rf/lora-connect/sx1278#documentation>`__) in
+ESPHome. Transceivers are connected via the :ref:`SPI Bus <spi>`. Supported frequencies range from
+137 MHz to 1020 MHz. Supported modulations include OOK, FSK, GFSK, MSK and GMSK. The LoRa modem is
+not supported by this component, only the FSK/OOK modem.
 
 .. figure:: images/sx127x-full.jpg
     :align: center
@@ -78,7 +81,8 @@ Actions:
 
 ``sx127x.set_mode_tx`` **Action**
 
-This :ref:`action <config-action>` sets the ``sx127x`` mode to tx, the ``sx127x`` needs to be in continuous mode.
+This :ref:`action <config-action>` sets the ``sx127x`` mode to tx, the ``sx127x`` needs to be
+in continuous mode.
 
 .. code-block:: yaml
 
@@ -115,12 +119,13 @@ This :ref:`action <config-action>` sends a packet, the ``sx127x`` needs to be in
 
 Configuration variables:
 
-- **data** (**Required**, list): The packet to send, length should match the configured payload_length.
+- **data** (**Required**, list): The packet to send, length should match the configured
+  payload_length.
 
 Packet Mode:
 ------------
 
-In packet mode the ``sx127x`` can be used as both a transmitter and receiver. Mode changes are handled transparently.
+In packet mode the ``sx127x`` can be used as both a transmitter and receiver.
 
 .. code-block:: yaml
 
@@ -159,8 +164,8 @@ Continuous Mode:
 
 **As a Receiver:**
 
-The ``sx127x`` will output demodulated data onto DIO2, typically :doc:`remote_receiver </components/remote_receiver>` is
-used to handle this.
+The ``sx127x`` will output demodulated data onto DIO2,
+:doc:`remote_receiver </components/remote_receiver>` is used.
 
 .. code-block:: yaml
 
@@ -180,9 +185,10 @@ used to handle this.
 
 **As a Transmitter:**
 
-The ``sx127x`` expects raw data to be sent on DIO2, typically :doc:`remote_transmitter </components/remote_transmitter>` is
-used to handle this. The ``sx127x`` mode must be set appropriately before and after transmit using the ``on_transmit`` and
-``on_complete`` automations.
+The ``sx127x`` expects raw data to be sent on DIO2,
+:doc:`remote_transmitter </components/remote_transmitter>` is used.
+The ``sx127x`` mode must be set appropriately before and after transmit using the
+``on_transmit`` and ``on_complete`` automations.
 
 .. code-block:: yaml
 
@@ -216,10 +222,10 @@ used to handle this. The ``sx127x`` mode must be set appropriately before and af
 
 **As a Transmitter & Receiver:**
 
-When ``one_wire`` is enabled in :doc:`remote_transmitter </components/remote_transmitter>` the pin will be
-configured in open drain mode. In open drain mode the pin is actively driven low or passively pulled high
-by pull-up. In addition to setting the ``sx127x`` mode the pin output should be set to low before transmit
-and to high before returning to receive.
+In :doc:`remote_transmitter </components/remote_transmitter>` ``one_wire`` must set to ``true`` and
+``eot_level`` set to ``false``. In addition to setting the ``sx127x`` mode in ``on_transmit`` &
+``on_complete`` the pin state should be pulled low before ``set_mode_tx`` and released before
+``set_mode_rx``.
 
 .. code-block:: yaml
 
