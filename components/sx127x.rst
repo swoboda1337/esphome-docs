@@ -162,7 +162,8 @@ Continuous Mode:
 
 **As a Receiver:**
 
-The radio will output demodulated data onto DIO2, typically :doc:`remote_receiver </components/remote_receiver>` is used to handle this. Remote Receiver can either decode the signal itself or pass the raw data to another component (or lambda).
+The radio will output demodulated data onto DIO2, typically :doc:`remote_receiver </components/remote_receiver>` is
+used to handle this.
 
 .. code-block:: yaml
 
@@ -180,13 +181,11 @@ The radio will output demodulated data onto DIO2, typically :doc:`remote_receive
       pin: GPIO32
       dump: raw
 
-.. note::
-
-    The pin used by remote receiver must be DIO2 not DIO0.
-
 **As a Transmitter:**
 
-The radio expects raw data to be sent on DIO2, typically :doc:`remote_transmitter </components/remote_transmitter>` is used to handle this. The radio transmitter must be enabled before transmit and disabled after. Ideally this is done using the remote transmitter triggers on_transmit and on_complete.
+The radio expects raw data to be sent on DIO2, typically :doc:`remote_transmitter </components/remote_transmitter>` is
+used to handle this. The radio mode must be set appropriately before and after transmit using the ``on_transmit`` and
+``on_complete`` triggers.
 
 .. code-block:: yaml
 
@@ -216,21 +215,17 @@ The radio expects raw data to be sent on DIO2, typically :doc:`remote_transmitte
           - remote_transmitter.transmit_raw:
               code: [614, -614, 600, -614, 614, -614, 601, -614]
 
-.. note::
-
-    The pin used by remote transmitter must be DIO2 not DIO0.
-
 **As a Transmitter & Receiver:**
 
-The radio can be used as both a transmitter and receiver. The same pin is used for both rx and tx. In order to make things work the gpio mode and radio mode must be set appropriately. The gpio mode will automatically be set if DIO2 is configured.
+When ``one_wire`` is enabled in :doc:`remote_transmitter </components/remote_transmitter>` the pin will be
+configured in open drain mode. In open drain mode the pin is actively driven low or passively pulled high
+by pull-up. In addition to setting the radio mode the pin output should be set to low before transmit
+and to high before returning to receive.
 
 .. code-block:: yaml
 
     # Example configuration entry
     sx127x:
-      dio2_pin:
-        number: GPIO32
-        allow_other_uses: true
       nss_pin: GPIO18
       rst_pin: GPIO23
       frequency: 433920000
@@ -254,12 +249,18 @@ The radio can be used as both a transmitter and receiver. The same pin is used f
         number: GPIO32
         allow_other_uses: true
       carrier_duty_percent: 100%
+      one_wire: true
+      eot_level: false
+      carrier_duty_percent: 100%
       on_transmit:
         then:
+          - sx127x.set_mode_standby
+          - lambda: 'id(tx_id)->digital_write(false);'
           - sx127x.set_mode_tx
-          - lambda: id(tx_id)->setup(); // workaround
       on_complete:
         then:
+          - sx127x.set_mode_standby
+          - lambda: 'id(tx_id)->digital_write(true);'
           - sx127x.set_mode_rx
 
     interval:
@@ -267,10 +268,6 @@ The radio can be used as both a transmitter and receiver. The same pin is used f
         then:
           - remote_transmitter.transmit_raw:
               code: [614, -614, 600, -614, 614, -614, 601, -614]
-
-.. note::
-
-    A workaround is currently needed in remote transmitter. Setup must be called again before transmitting after a gpio mode change.
 
 See Also
 --------
