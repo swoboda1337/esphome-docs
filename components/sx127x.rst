@@ -83,7 +83,7 @@ Actions:
 
 ``sx127x.set_mode_tx`` **Action**
 
-This :ref:`action <config-action>` sets the ``sx127x`` mode to tx, ``sx127x`` needs to be in continuous mode. If DIO2 is configured the pin mode will be set appropriately.
+This :ref:`action <config-action>` sets the ``sx127x`` mode to tx, ``sx127x`` needs to be in continuous mode.
 
 .. code-block:: yaml
 
@@ -92,7 +92,7 @@ This :ref:`action <config-action>` sets the ``sx127x`` mode to tx, ``sx127x`` ne
 
 ``sx127x.set_mode_rx`` **Action**
 
-This :ref:`action <config-action>` sets the ``sx127x`` mode to rx. If DIO2 is configured the pin mode will be set appropriately.
+This :ref:`action <config-action>` sets the ``sx127x`` mode to rx.
 
 .. code-block:: yaml
 
@@ -101,7 +101,7 @@ This :ref:`action <config-action>` sets the ``sx127x`` mode to rx. If DIO2 is co
 
 ``sx127x.set_mode_standby`` **Action**
 
-This :ref:`action <config-action>` sets the ``sx127x`` mode to standby. If DIO2 is configured the pin mode will be set appropriately.
+This :ref:`action <config-action>` sets the ``sx127x`` mode to standby.
 
 .. code-block:: yaml
 
@@ -125,7 +125,7 @@ Configuration variables:
 Packet Mode:
 ------------
 
-In packet mode the radio can be used as both a transmitter and receiver. Mode changes are handled transparently.
+In packet mode the ``sx127x`` can be used as both a transmitter and receiver. Mode changes are handled transparently.
 
 .. code-block:: yaml
 
@@ -162,7 +162,7 @@ Continuous Mode:
 
 **As a Receiver:**
 
-The radio will output demodulated data onto DIO2, typically :doc:`remote_receiver </components/remote_receiver>` is
+The ``sx127x`` will output demodulated data onto DIO2, typically :doc:`remote_receiver </components/remote_receiver>` is
 used to handle this.
 
 .. code-block:: yaml
@@ -183,9 +183,9 @@ used to handle this.
 
 **As a Transmitter:**
 
-The radio expects raw data to be sent on DIO2, typically :doc:`remote_transmitter </components/remote_transmitter>` is
-used to handle this. The radio mode must be set appropriately before and after transmit using the ``on_transmit`` and
-``on_complete`` triggers.
+The ``sx127x`` expects raw data to be sent on DIO2, typically :doc:`remote_transmitter </components/remote_transmitter>` is
+used to handle this. The ``sx127x`` mode must be set appropriately before and after transmit using the ``on_transmit`` and
+``on_complete`` automations.
 
 .. code-block:: yaml
 
@@ -219,7 +219,7 @@ used to handle this. The radio mode must be set appropriately before and after t
 
 When ``one_wire`` is enabled in :doc:`remote_transmitter </components/remote_transmitter>` the pin will be
 configured in open drain mode. In open drain mode the pin is actively driven low or passively pulled high
-by pull-up. In addition to setting the radio mode the pin output should be set to low before transmit
+by pull-up. In addition to setting the ``sx127x`` mode the pin output should be set to low before transmit
 and to high before returning to receive.
 
 .. code-block:: yaml
