@@ -81,8 +81,7 @@ Actions:
 
 ``sx127x.set_mode_tx`` **Action**
 
-This :ref:`action <config-action>` sets the ``sx127x`` mode to tx, the ``sx127x`` needs to be
-in continuous mode.
+This :ref:`action <config-action>` sets the ``sx127x`` mode to tx.
 
 .. code-block:: yaml
 
@@ -223,7 +222,7 @@ The ``sx127x`` mode must be set appropriately before and after transmit using th
 **As a Transmitter & Receiver:**
 
 In :doc:`remote_transmitter </components/remote_transmitter>` ``one_wire`` must set to ``true`` and
-``eot_level`` set to ``false``. In addition to setting the ``sx127x`` mode in ``on_transmit`` &
+``eot_level`` set to ``false``. In addition to setting the ``sx127x`` mode in ``on_transmit`` /
 ``on_complete`` the pin state should be pulled low before ``set_mode_tx`` and released before
 ``set_mode_rx``.
 
