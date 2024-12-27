@@ -28,11 +28,6 @@ The ``sx127x`` component allows you to configure the SX1276, SX1277, SX1278 and 
       rx_start: true
       rx_bandwidth: 50_0kHz
       rx_floor: -90
-      pa_pin: BOOST
-      pa_power: 17
-      shaping: NONE
-      fsk_fdev: 5000
-      fsk_ramp: 40us
 
 Configuration variables:
 ------------------------
@@ -83,7 +78,7 @@ Actions:
 
 ``sx127x.set_mode_tx`` **Action**
 
-This :ref:`action <config-action>` sets the ``sx127x`` mode to tx, ``sx127x`` needs to be in continuous mode.
+This :ref:`action <config-action>` sets the ``sx127x`` mode to tx, the ``sx127x`` needs to be in continuous mode.
 
 .. code-block:: yaml
 
@@ -151,11 +146,13 @@ In packet mode the ``sx127x`` can be used as both a transmitter and receiver. Mo
           - lambda: |-
               ESP_LOGD("lambda", "packet %s", format_hex(x).c_str());
 
-      interval:
-       - interval: 60sec
-         then:
-           - sx127x.send_packet:
-               data: [0xC5, 0x51, 0x78, 0x82, 0xB7, 0xF9, 0x9C, 0x5C]
+      button:
+        - platform: template
+          name: "Transmit Packet"
+          on_press:
+            then:
+              - sx127x.send_packet:
+                 data: [0xC5, 0x51, 0x78, 0x82, 0xB7, 0xF9, 0x9C, 0x5C]
 
 Continuous Mode:
 ----------------
@@ -209,11 +206,13 @@ used to handle this. The ``sx127x`` mode must be set appropriately before and af
         then:
           - sx127x.set_mode_standby
 
-    interval:
-      - interval: 30sec
-        then:
-          - remote_transmitter.transmit_raw:
-              code: [614, -614, 600, -614, 614, -614, 601, -614]
+    button:
+      - platform: template
+        name: "Transmit Raw"
+        on_press:
+          then:
+            - remote_transmitter.transmit_raw:
+                code: [614, -614, 600, -614, 614, -614, 601, -614]
 
 **As a Transmitter & Receiver:**
 
@@ -263,11 +262,13 @@ and to high before returning to receive.
           - lambda: 'id(tx_id)->digital_write(true);'
           - sx127x.set_mode_rx
 
-    interval:
-      - interval: 30sec
-        then:
-          - remote_transmitter.transmit_raw:
-              code: [614, -614, 600, -614, 614, -614, 601, -614]
+    button:
+      - platform: template
+        name: "Transmit Raw"
+        on_press:
+          then:
+            - remote_transmitter.transmit_raw:
+                code: [614, -614, 600, -614, 614, -614, 601, -614]
 
 See Also
 --------
