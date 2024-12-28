@@ -44,8 +44,8 @@ Configuration variables:
 - **frequency** (**Required**, int): Frequency in Hz of the transceiver.
 - **modulation** (**Required**, enum): Modulation can be ``OOK`` or ``FSK``.
 - **payload_length** (**Optional**, int): If greater than zero packet mode is enabled, otherwise
-  continuous mode is used. In packet mode, packets are received with the ``on_packet`` trigger and
-  sent via the ``send_packet`` automation. In continuous mode raw data appears on the DIO2 pin.
+  continuous mode is used. In packet mode, bytes are received with the ``on_packet`` trigger and
+  sent via the ``send_packet`` automation. In continuous mode raw data is sent and received on DIO2.
 - **bitrate** (**Optional**, int): Bit rate of the signal. Required in packet mode and recommended
   in continuous mode. Normally the inverse of the bit duration, eg 1 / 208 us is 4800 bps.
 - **bitsync** (**Optional**, bool): Enables the receive bit synchronizer. Required in packet mode.
