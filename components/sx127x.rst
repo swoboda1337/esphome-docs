@@ -37,10 +37,8 @@ Configuration variables:
 
 - **rst_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): Reset pin.
 - **nss_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): SPI select pin.
-- **dio0_pin** (**Optional**, :ref:`Pin Schema <config-pin_schema>`): Digital IO pin 0, only required in
-  packet mode.
-- **dio2_pin** (**Optional**, :ref:`Pin Schema <config-pin_schema>`): Digital IO pin 2, only required for
-  FSK debug.
+- **dio0_pin** (**Optional**, :ref:`Pin Schema <config-pin_schema>`): Digital IO pin 0.
+- **dio2_pin** (**Optional**, :ref:`Pin Schema <config-pin_schema>`): Digital IO pin 2.
 - **frequency** (**Required**, int): Frequency in Hz of the transceiver.
 - **modulation** (**Required**, enum): Modulation can be ``OOK`` or ``FSK``.
 - **payload_length** (**Optional**, int): If greater than zero packet mode is enabled, otherwise
