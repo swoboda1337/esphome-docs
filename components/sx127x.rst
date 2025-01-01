@@ -279,7 +279,6 @@ In :doc:`remote_transmitter </components/remote_transmitter>` ``one_wire`` must 
       pin:
         number: GPIO32
         allow_other_uses: true
-      carrier_duty_percent: 100%
       one_wire: true
       eot_level: false
       carrier_duty_percent: 100%
