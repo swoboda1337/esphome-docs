@@ -38,7 +38,6 @@ Configuration variables:
 - **rst_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): Reset pin.
 - **nss_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): SPI select pin.
 - **dio0_pin** (**Optional**, :ref:`Pin Schema <config-pin_schema>`): Digital IO pin 0.
-- **dio2_pin** (**Optional**, :ref:`Pin Schema <config-pin_schema>`): Digital IO pin 2.
 - **frequency** (**Required**, int): Frequency in Hz of the transceiver.
 - **modulation** (**Required**, enum): Modulation can be ``OOK`` or ``FSK``.
 - **payload_length** (**Optional**, int): If greater than zero packet mode is enabled, otherwise
@@ -68,10 +67,6 @@ Receiver configuration variables:
   environment. If set too high (ie closer to 0) the radio will ignore everything. If set too low
   (ie closer to -128) too much noise will get through. When receiving FSK without a preamble configured
   ``rx_floor`` is used to trigger the receiver.
-- **rx_duration** (**Optional**, int or :ref:`config-time`): Requires ``dio0_pin`` and ``dio2_pin`` to be
-  configured in continuous mode. The FSK demodulator, unlike OOK, cannot be gated by signal strength. In
-  order to isolate the wanted signal DIO2 can be gated until the receiver is triggered by ``rx_floor`` or
-  preamble detection. Intended for FSK debug, packet mode is recommended for FSK.
 
 Transmit configuration variables:
 *********************************
