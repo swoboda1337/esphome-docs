@@ -85,7 +85,7 @@ Transmit configuration variables:
 .. note::
 
     Configuration variables can be changed at runtime using lambdas. Settings will only be applied
-    after calling configure. See :apiref:`sx127x/sx127x.h`.
+    after calling ``configure``. See :apiref:`sx127x/sx127x.h`.
 
 Automations:
 ------------
