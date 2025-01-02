@@ -209,6 +209,11 @@ The ``sx127x`` will output demodulated data onto DIO2,
       pin: GPIO32
       dump: raw
 
+.. note::
+
+    It is not recommended to receive FSK in continuous mode as there will be too
+    much noise. Use packet mode instead.
+
 **As a Transmitter:**
 
 The ``sx127x`` expects raw data to be sent on DIO2,
