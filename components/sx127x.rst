@@ -46,7 +46,7 @@ Configuration variables:
 - **bitrate** (**Optional**, int): Bit rate of the signal. Required in packet mode and recommended
   in continuous mode. Normally the inverse of the bit duration, eg 1 / 208 us is 4800 bps.
 - **bitsync** (**Optional**, bool): Enables the receive bit synchronizer. Required in packet mode.
-  Recommended in continuous mode, if there is no preamble plus high noise or low signal levels it
+  Recommended in continuous mode, however if there is no preamble plus high noise or low signal levels it
   may be better to turn it off.
 - **preamble_size** (**Optional**, int): Length of the preamble in bytes. Preamble detector is disabled
   if the size is 0.
