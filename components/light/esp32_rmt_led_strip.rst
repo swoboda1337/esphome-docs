@@ -46,6 +46,7 @@ Configuration variables
 - **max_refresh_rate** (*Optional*, :ref:`config-time`): A time interval used to limit the number of commands a light
   can handle per second. For example, ``16ms`` will limit the light to a refresh rate of about 60Hz. Defaults to
   sending commands as quickly as changes are made to the lights.
+- **use_psram** (*Optional*, boolean): Will allocate the memory from PSRAM instead of DRAM. Defaults to ``true``.
 
 IDF configuration variables:
 ****************************
@@ -78,6 +79,12 @@ Arduino configuration variables:
       "ESP32-C3", "0, 1"
 
 - All other options from :ref:`Light <config-light>`.
+
+.. note::
+
+    When **use_psram** is configured using IDF all RMT interrupts will be deferred, including RMT interrupts for other
+    components. RMT transactions rely on ping-pong interrupts, delayed handling can lead to an unpredictable result.
+    It is recommended to configure allocate the maximum RMT memory possible.
 
 .. _esp32-rmt-led-strip-manual_timings:
 
