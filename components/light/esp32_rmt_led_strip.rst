@@ -46,7 +46,7 @@ Configuration variables
 - **max_refresh_rate** (*Optional*, :ref:`config-time`): A time interval used to limit the number of commands a light
   can handle per second. For example, ``16ms`` will limit the light to a refresh rate of about 60Hz. Defaults to
   sending commands as quickly as changes are made to the lights.
-- **use_psram** (*Optional*, boolean): Will allocate the memory from PSRAM instead of DRAM. Defaults to ``false``.
+- **use_psram** (*Optional*, boolean): Will allocate memory from PSRAM instead of DRAM. Defaults to ``false``.
 
 IDF configuration variables:
 ****************************
