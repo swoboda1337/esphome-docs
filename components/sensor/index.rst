@@ -578,7 +578,7 @@ the last value and only after the specified time period has passed without any n
 values.
 
 ``confirmation``
-*********
+****************
 
 This filter stores the last value and only passes incoming values through if the incoming value is 
 sufficiently similar to the previously one. This difference can be calculated in two ways an absolute 
