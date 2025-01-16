@@ -151,6 +151,7 @@ Filters are applied in the order they are defined in your configuration.
       - heartbeat: 5s
       - debounce: 0.1s
       - timeout: 1min
+      - confirmation: 5.0
       - delta: 5.0
       - or:
         - throttle: 1s
@@ -575,6 +576,33 @@ Only send values if the last incoming value is at least ``specified time period`
 old. For example if two values come in at almost the same time, this filter will only output
 the last value and only after the specified time period has passed without any new incoming
 values.
+
+``confirmation``
+*********
+
+This filter stores the last value and only passes incoming values through if the incoming value is 
+sufficiently similar to the previously one. This difference can be calculated in two ways an absolute 
+difference or a percentage difference. Useful to filter out corrupted values, e.g. a false CRC pass from
+a wireless sensor.
+
+If a number is specified, it will be used as the absolute difference required.
+For example if the filter were configured with a value of 2 and the last value passed through was 10,
+only values greater than 12 or less than 8 would be passed through.
+
+.. code-block:: yaml
+
+    filters:
+      - confirmation: 2.0
+
+If a percentage is specified a percentage of the last value will be used as the required difference.
+For example if the filter were configured with a value of 20% and the last value was 10, only values 
+greater than 12 or less than 8 would be passed through. However, if the last value was 100 only values
+greater than 120 or less than 80 would be passed through.
+
+.. code-block:: yaml
+
+    filters:
+      - confirmation: 20%
 
 ``delta``
 *********
