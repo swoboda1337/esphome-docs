@@ -58,7 +58,7 @@ ESP32 IDF configuration variables:
 
 - **clock_resolution** (*Optional*, int): The clock resolution used by the RMT peripheral in hz. Defaults to ``1000000``.
 - **one_wire** (*Optional*, boolean): Allows the ``pin`` to be used by both the transmitter and a receiver. As the ``pin`` will
-  be in open drain mode a pull-up is required, set the ``pin`` mode to pullup or provide an external one.
+  be in open drain mode a pullup is required, set the ``pin`` mode to pullup or provide an external one.
 - **use_dma** (*Optional*, boolean): Enable DMA on variants that support it.
 - **eot_level** (*Optional*, boolean): Overrides the default end of transmit level. Defaults to ``false`` unless ``one_wire``
   mode is ``true`` or ``pin`` is inverted.
