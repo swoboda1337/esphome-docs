@@ -24,7 +24,7 @@ not supported by this component, only the FSK/OOK modem.
       miso_pin: GPIO19
 
     sx127x:
-      nss_pin: GPIO18
+      cs_pin: GPIO18
       rst_pin: GPIO23
       frequency: 433920000
       modulation: OOK
@@ -36,7 +36,7 @@ Configuration variables:
 ------------------------
 
 - **rst_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): Reset pin.
-- **nss_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): SPI select pin.
+- **cs_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): SPI chip select pin.
 - **dio0_pin** (**Optional**, :ref:`Pin Schema <config-pin_schema>`): Digital IO pin 0.
 - **frequency** (**Required**, int): Frequency in Hz of the transceiver.
 - **modulation** (**Required**, enum): Modulation can be ``OOK`` or ``FSK``.
@@ -158,7 +158,7 @@ In packet mode the ``sx127x`` can be used as both a transmitter and receiver.
     # Example configuration entry
     sx127x:
       dio0_pin: GPIO26
-      nss_pin: GPIO18
+      cs_pin: GPIO18
       rst_pin: GPIO23
       pa_pin: BOOST
       pa_power: 17
@@ -197,7 +197,7 @@ The ``sx127x`` will output demodulated data onto DIO2,
 
     # Example configuration entry
     sx127x:
-      nss_pin: GPIO18
+      cs_pin: GPIO18
       rst_pin: GPIO23
       frequency: 433920000
       modulation: OOK
@@ -225,7 +225,7 @@ The ``sx127x`` mode must be set appropriately before and after transmit using th
 
     # Example configuration entry
     sx127x:
-      nss_pin: GPIO18
+      cs_pin: GPIO18
       rst_pin: GPIO23
       frequency: 433920000
       modulation: OOK
@@ -263,7 +263,7 @@ the pin should be driven low before ``set_mode_tx`` and pulled high / released b
 
     # Example configuration entry
     sx127x:
-      nss_pin: GPIO18
+      cs_pin: GPIO18
       rst_pin: GPIO23
       frequency: 433920000
       modulation: OOK
