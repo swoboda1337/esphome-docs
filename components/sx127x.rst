@@ -253,9 +253,10 @@ The ``sx127x`` mode must be set appropriately before and after transmit using th
 
 **As a Transmitter & Receiver:**
 
-In :doc:`remote_transmitter </components/remote_transmitter>` ``one_wire`` must set to ``true`` and
-``eot_level`` set to ``false``. In addition to setting the ``sx127x`` mode in ``on_transmit`` /
-``on_complete`` the pin state should be pulled low before ``set_mode_tx`` and released before
+The shared ``pin`` should to be set to open-drain with a pullup. In
+:doc:`remote_transmitter </components/remote_transmitter>` ``eot_level`` should be set to
+``false``. In addition to setting the ``sx127x`` mode in ``on_transmit`` / ``on_complete``
+the pin should be driven low before ``set_mode_tx`` and pulled high / released before
 ``set_mode_rx``.
 
 .. code-block:: yaml
@@ -276,6 +277,11 @@ In :doc:`remote_transmitter </components/remote_transmitter>` ``one_wire`` must 
       id: rx_id
       pin:
         number: GPIO32
+        mode:
+          input: true
+          output: true
+          pullup: true
+          open_drain: true
         allow_other_uses: true
       dump: raw
 
@@ -283,8 +289,12 @@ In :doc:`remote_transmitter </components/remote_transmitter>` ``one_wire`` must 
       id: tx_id
       pin:
         number: GPIO32
+        mode:
+          input: true
+          output: true
+          pullup: true
+          open_drain: true
         allow_other_uses: true
-      one_wire: true
       eot_level: false
       carrier_duty_percent: 100%
       on_transmit:
