@@ -157,9 +157,9 @@ In packet mode the ``sx127x`` can be used as both a transmitter and receiver.
 
     # Example configuration entry
     sx127x:
-      dio0_pin: GPIO26
       cs_pin: GPIO18
       rst_pin: GPIO23
+      dio0_pin: GPIO26
       pa_pin: BOOST
       pa_power: 17
       bitsync: true
