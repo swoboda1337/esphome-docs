@@ -35,8 +35,8 @@ not supported by this component, only the FSK/OOK modem.
 Configuration variables:
 ------------------------
 
-- **rst_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): Reset pin.
 - **cs_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): SPI chip select pin.
+- **rst_pin** (**Required**, :ref:`Pin Schema <config-pin_schema>`): Reset pin.
 - **dio0_pin** (**Optional**, :ref:`Pin Schema <config-pin_schema>`): Digital IO pin 0.
 - **frequency** (**Required**, int): Frequency in Hz of the transceiver.
 - **modulation** (**Required**, enum): Modulation can be ``OOK`` or ``FSK``.
