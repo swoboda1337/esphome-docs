@@ -48,6 +48,7 @@ Configuration variables:
 - **bitsync** (**Optional**, bool): Enables the receive bit synchronizer. Required in packet mode.
   Recommended in continuous mode, however if there is no preamble plus high noise it may be better to
   turn it off.
+- **crc_enable** (**Optional**, bool): Enables a 16 bit CRC calculation/check in packet mode.
 - **preamble_size** (**Optional**, int): Length of the preamble in bytes. Preamble detector is disabled
   if the size is 0.
 - **preamble_polarity** (**Optional**, int): Polarity of the preamble, either 0xAA or 0x55.
@@ -162,8 +163,9 @@ In packet mode the ``sx127x`` can be used as both a transmitter and receiver.
       dio0_pin: GPIO26
       pa_pin: BOOST
       pa_power: 17
-      bitsync: true
       bitrate: 4800
+      bitsync: true
+      crc_enable: true
       frequency: 433920000
       modulation: FSK
       rx_start: true
