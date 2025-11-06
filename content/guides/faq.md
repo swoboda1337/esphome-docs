@@ -584,8 +584,8 @@ Always back up your files!
 
 ## Why shouldn't I use underscores in my device name?
 
-The top level `name:` field in your `.yaml` configuration file defines the node name ("hostname") on the local
-network. According to [RFC1912](https://datatracker.ietf.org/doc/html/rfc1912), underscore (`_`  ) characters in
+The top level `name:` field in your `.yaml configuration file defines the node name ("hostname") on the local
+network. According to [RFC1912](https://datatracker.ietf.org/doc/html/rfc1912), underscore (`  ) characters in
 hostnames are not valid. In practice, some DNS/DHCP setups may work correctly with underscores while others will not.
 If you're using static IP addresses, you're unlikely to encounter any issues. In some cases, initial setup may work,
 but connections might fail when Home Assistant restarts or if you change router hardware.

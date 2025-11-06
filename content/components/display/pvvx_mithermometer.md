@@ -100,7 +100,7 @@ Possible values for the unit of the big number (`it.print_unit()`  ) are:
 - `pvvx_mithermometer::UNIT_DEG_GHE`  : show `°Г`
 - `pvvx_mithermometer::UNIT_MINUS`  : show `-`
 - `pvvx_mithermometer::UNIT_DEG_F`  : show `°F`
-- `pvvx_mithermometer::UNIT_LOWDASH`  : show `_`
+- `pvvx_mithermometer::UNIT_LOWDASH  : show `
 - `pvvx_mithermometer::UNIT_DEG_C`  : show `°C`
 - `pvvx_mithermometer::UNIT_LINES`  : show `=`
 - `pvvx_mithermometer::UNIT_DEG_E`  : show `°E`

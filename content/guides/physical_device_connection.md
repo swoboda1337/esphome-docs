@@ -170,10 +170,13 @@ multimeter in continuity mode to figure it out (advanced topic).
   caption="An ESP8266 module with programming wires soldered on" width="75.0%" class="align-center" >}}
 
 If the device has a module but no programming headers, things get a bit tricky.
-You'll need a [USB to serial adapter](#usb-serial-adapter), :ref:`jumper
-wires <jumper-wires>`, [wire strippers](#wire-strippers), :ref:`wire snips
-<wire-snips>`, a [soldering iron](#soldering-iron), :ref:`solder
-<solder>`, and a bit of [flux](#soldering-flux) would help.
+You'll need a [USB to serial adapter](#usb-serial-adapter), [jumper
+wires <jumper-wires>](#jumper
+wires <jumper-wires>), [wire strippers](#wire-strippers), [wire snips
+<wire-snips>](#wire snips
+<wire-snips>), a [soldering iron](#soldering-iron), [solder
+<solder>](#solder
+<solder>), and a bit of [flux](#soldering-flux) would help.
 
 Cut the jumper wires, strip a bit off the end, and then solder them onto the
 module. You can find the correct places to solder the wires by looking up the

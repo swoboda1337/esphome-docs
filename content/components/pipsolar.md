@@ -22,7 +22,7 @@ Once configured, you can use sensors, binary sensors, switches and outputs as de
 ## Overview
 
 You can connect a wide variety of PV Inverters as long as they provide a serial interface and talk the commands used (at least those you want to use).
-A documentation about the communication protocol mostly supported can be found replace:: ``here``_.
+Documentation about the communication protocol can be found online.
 
 This component will poll the needed polling commands in a loop. If there is a command to send for controlling the inverter this command will be queued and fired as next after the current polling command ends.
 There is a buffer to buffer up to 10 commands.
