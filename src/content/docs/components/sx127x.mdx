@@ -37,6 +37,10 @@ sx127x:
 - **cs_pin** (**Required**, [Pin Schema](/guides/configuration-types#pin-schema)): SPI chip select pin.
 - **rst_pin** (**Required**, [Pin Schema](/guides/configuration-types#pin-schema)): Reset pin.
 - **dio0_pin** (**Optional**, [Pin Schema](/guides/configuration-types#pin-schema)): Digital IO pin 0.
+- **dio1_pin** (**Optional**, [Pin Schema](/guides/configuration-types#pin-schema)): Digital IO pin 1,
+  mapped to the chip's FifoLevel signal. Required when FSK/OOK `payload_length` exceeds the 64-byte FIFO;
+  the component uses this interrupt to stream large packets through the FIFO. When wired, variable
+  length FSK/OOK packets can also receive up to 255 bytes.
 - **auto_cal** (**Optional**, bool): Enable automatic image calibration on temperature changes. Defaults to `true`.
 - **frequency** (**Required**, frequency): Frequency in Hz of the transceiver.
 - **modulation** (**Required**, enum): Modulation can be `OOK`, `FSK` or `LORA`  `.
@@ -79,11 +83,6 @@ sx127x:
 - **packet_mode** (*Optional*, bool): In packet mode bytes are sent via the `send_packet`
   automation and received with the `on_packet` trigger. If not enabled continuous mode is
   used and raw data is sent and received on DIO2.
-
-- **dio1_pin** (**Optional**, [Pin Schema](/guides/configuration-types#pin-schema)): Digital IO pin 1,
-  mapped to the chip's FifoLevel signal. Required when `payload_length` exceeds the 64-byte FIFO; the
-  component uses this interrupt to stream large packets through the FIFO. When wired, the variable
-  length format can also receive up to 255 bytes per packet.
 
 - **payload_length** (**Optional**, int): Length of the payload in packet mode. If not configured then
   the variable length packet format is used (maximum 63 bytes, or 255 when `dio1_pin` is set). In
