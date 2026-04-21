@@ -37,7 +37,7 @@ sx127x:
 - **cs_pin** (**Required**, [Pin Schema](/guides/configuration-types#pin-schema)): SPI chip select pin.
 - **rst_pin** (**Required**, [Pin Schema](/guides/configuration-types#pin-schema)): Reset pin.
 - **dio0_pin** (**Optional**, [Pin Schema](/guides/configuration-types#pin-schema)): Digital IO pin 0,
-  signals packet-done events (RxDone/TxDone in LoRa, PayloadReady/PacketSent in FSK/OOK packet mode).
+  required for LoRa and FSK/OOK packet mode.
 - **dio1_pin** (**Optional**, [Pin Schema](/guides/configuration-types#pin-schema)): Digital IO pin 1,
   required for FSK/OOK packets larger than the 64-byte FIFO.
 - **auto_cal** (**Optional**, bool): Enable automatic image calibration on temperature changes. Defaults to `true`.
