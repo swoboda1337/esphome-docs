@@ -57,7 +57,7 @@ sx127x:
 
 - **payload_length** (**Optional**, int): If greater than zero implicit header mode is enabled and the
   packet size is fixed. If not configured explicit header mode is enabled and variable packet sizes can
-  be used. Maximum length is 256. Must be greater than zero when using a `spreading_factor` of 6.
+  be used. Maximum length is 255. Must be greater than zero when using a `spreading_factor` of 6.
 
 - **crc_enable** (**Optional**, bool): Enables a payload CRC calculation/check.
 - **preamble_size** (*Optional*, int): Length of the preamble in symbols, minimum of 6.
@@ -80,8 +80,14 @@ sx127x:
   automation and received with the `on_packet` trigger. If not enabled continuous mode is
   used and raw data is sent and received on DIO2.
 
+- **dio1_pin** (**Optional**, [Pin Schema](/guides/configuration-types#pin-schema)): Digital IO pin 1,
+  mapped to the chip's FifoLevel signal. Required when `payload_length` exceeds the 64-byte FIFO; the
+  component uses this interrupt to stream large packets through the FIFO. When wired, the variable
+  length format can also receive up to 255 bytes per packet.
+
 - **payload_length** (**Optional**, int): Length of the payload in packet mode. If not configured then
-  the variable length packet format is used. Maximum length is 64.
+  the variable length packet format is used (maximum 63 bytes, or 255 when `dio1_pin` is set). In
+  fixed length mode the maximum is 64 bytes, or 2047 when `dio1_pin` is set.
 
 - **crc_enable** (**Optional**, bool): Enables a 16 bit CRC calculation/check in packet mode.
 - **bitrate** (**Optional**, int): Bit rate of the signal. Required in packet mode and recommended
