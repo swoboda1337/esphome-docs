@@ -1,6 +1,8 @@
 // Downloads the referrer allowlist at build time and writes it to a JSON file that
 // Astro imports. Run via the `prebuild`/`predev` npm hooks. On failure it keeps the
-// existing committed file so the build still succeeds.
+// existing file if there is one, otherwise it writes an empty allowlist so the
+// import still resolves and the build succeeds.
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +23,11 @@ async function main() {
   console.log(`[allowed-referrers] wrote ${referrers.length} domains to ${OUTPUT}`);
 }
 
-main().catch((e) => {
-  console.warn(`[allowed-referrers] fetch failed, keeping committed file. ${e}`);
+main().catch(async (e) => {
+  if (existsSync(OUTPUT)) {
+    console.warn(`[allowed-referrers] fetch failed, keeping existing file. ${e}`);
+    return;
+  }
+  console.warn(`[allowed-referrers] fetch failed, writing empty allowlist. ${e}`);
+  await writeFile(OUTPUT, "[]\n");
 });
