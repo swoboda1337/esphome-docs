@@ -564,6 +564,14 @@ export function toInner(entry, variant = null) {
   return null;
 }
 
+/** Whether `needle` is `root` or an object reachable from it. */
+function contains(root, needle, seen = new Set()) {
+  if (root === needle) return true;
+  if (!root || typeof root !== "object" || seen.has(root)) return false;
+  seen.add(root);
+  return Object.values(root).some((v) => contains(v, needle, seen));
+}
+
 /** The schema a config var opens (nested mapping, trigger or typed), or null. */
 function propInner(prop) {
   if (!prop) return null;
@@ -1456,6 +1464,12 @@ export class Walker {
       // values are shared with the base, so their text reaches every schema that inherits the key. The
       // variant whose extends chain reached the key is the one that accepts it.
       const target = found.root ?? sectionInner.variants[0];
+      if (!target.config_vars?.[parsed.key] && contains(prop, target)) {
+        // A recursive key (a menu item's `items` is the item list again): a copy here would hold the
+        // variant that holds the copy, which no JSON can carry. The base's own docs cover it
+        e.propsSkipped++;
+        return;
+      }
       target.config_vars ??= {};
       const refined = (target.config_vars[parsed.key] ??= { ...prop });
       refined.docs = converted;
