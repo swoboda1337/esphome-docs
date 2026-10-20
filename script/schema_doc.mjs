@@ -51,6 +51,7 @@ const MIN_EMITTED_INTROS = {
 };
 
 const CONFIG_VARS_RE = /^Configuration (variables|options):?$/i;
+const PIN_VARS_RE = /^Pin configuration variables:?$/i;
 const MARKER_RE = /^\s*\/\*\s*schema:\s*(\S+)\s*\*\/\s*$/;
 const REGISTRY_TYPES = new Set(["action", "condition", "filter", "effects"]);
 
@@ -217,8 +218,9 @@ export class SchemaStore {
       const doc = await this.file(top.split(".")[0]);
       const upper = top.toUpperCase();
       const rank = (topName, schemaName) => {
-        if (topName === top && (schemaName === `${upper}_SCHEMA` || schemaName === `_${upper}_SCHEMA`)) return 0;
         if (/_(ACTION|CONDITION)_SCHEMA$/.test(schemaName)) return 3;
+        // SENSOR_SCHEMA, _SENSOR_SCHEMA, but also BASIC_DISPLAY_SCHEMA, BASE_OTA_SCHEMA or FLOAT_OUTPUT_SCHEMA
+        if (topName === top && new RegExp(`^_?(?:[A-Z0-9]+_)?${upper}_SCHEMA$`).test(schemaName)) return 0;
         return topName === top ? 1 : 2;
       };
       const variants = Object.entries(doc ?? {})
@@ -276,6 +278,9 @@ export class SchemaStore {
         if (entry) return { entry, registry: true };
       } else if (rest.length === 1 && top.schemas?.[rest[0]]) {
         return { entry: top.schemas[rest[0]], registry: false };
+      } else if (rest.length === 1 && rest[0] === "pin" && top.pin) {
+        // The pin schema a GPIO expander registers
+        return { entry: top.pin, registry: false };
       }
     }
     return null;
@@ -619,8 +624,10 @@ function itemText(tree, item) {
 const PAREN = "\\((?:[^()]|\\([^()]*\\))*\\)";
 const TYPE_GROUP = `((?:${PAREN}\\s*)*${PAREN})`;
 // A bullet that was meant to be an option but does not start with a bold key
-const LOOKS_LIKE_OPTION_RE = /^`[a-z0-9_]+`\s*\(|\(\s*(?:\*\*|\*)?(?:required|optional)\b/i;
 const LAST_PAREN_RE = new RegExp(`\\(((?:[^()]|\\([^()]*\\))*)\\)\\s*$`);
+// "(**Required**, ...)" anywhere, and "`key` (" opening a bullet: an option bullet with the wrong markup
+const OPTIONALITY_IN_TEXT_RE = /\(\s*(?:\*\*|\*)?(?:required|optional)\b/i;
+const CODE_KEY_BULLET_RE = /^`[a-z0-9_]+`\s*\(/;
 const PROP_RE = new RegExp(`^\\*\\*(\\w+)\\*\\*(?::\\s*${TYPE_GROUP}(?::\\s*|\\s+|$)|(?: ${TYPE_GROUP})?: )(.*)$`);
 const ENUM_RE = /^(?:`([^`]*)`|\*\*([^*]*)\*\*)\s*(?:(?:-|:)\s*(.*)|\(([^)]*)\)(?:\s*(?::|-)\s*(.*))?)?$/;
 
@@ -687,13 +694,15 @@ export function registryHeading(node) {
   return { name: codes[0].value, names: codes.map((c) => c.value), type: m[1].toLowerCase() };
 }
 
-/** `time.on_time` Trigger -> on_time */
+/** `time.on_time` Trigger -> ["time.on_time"]; "`a` / `b` Trigger" names both */
 function triggerHeading(node) {
-  const code = node.children.find((c) => c.type === "inlineCode");
-  if (!code) return null;
-  const rest = toString({ children: node.children.filter((c) => c.type !== "inlineCode") }).trim();
-  if (!/^Trigger$/i.test(rest)) return null;
-  return code.value;
+  const codes = node.children.filter((c) => c.type === "inlineCode");
+  if (!codes.length) return null;
+  const rest = toString({ children: node.children.filter((c) => c.type !== "inlineCode") })
+    .replace(/\s*\/\s*/g, " ")
+    .trim();
+  if (!/^Triggers?$/i.test(rest)) return null;
+  return codes.map((c) => c.value);
 }
 
 /** The code span of a heading that is nothing but `name`, else null. */
@@ -1166,8 +1175,15 @@ export class Walker {
   enumValueKey(prop, value) {
     value = String(value).replace(/^`|`$/g, ""); // **`value`**: bold around code keeps the backticks
     if (Object.hasOwn(prop.values, value)) return value;
-    const lower = value.toLowerCase();
-    return Object.keys(prop.values).find((k) => k.toLowerCase() === lower) ?? null;
+    // cv.one_of accepts any case and, with space="_", spaces or dashes for underscores; the docs quote
+    // values YAML would read as booleans ('OFF')
+    const norm = (v) =>
+      v
+        .replace(/^['"]|['"]$/g, "")
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_");
+    const wanted = norm(value);
+    return Object.keys(prop.values).find((k) => norm(k) === wanted) ?? null;
   }
 
   /**
@@ -1526,6 +1542,14 @@ export class Walker {
       await this.openConfigSection(node.depth, line);
       return;
     }
+    if (PIN_VARS_RE.test(text) && this.componentRef && this.componentRef !== "core") {
+      // "## Pin configuration variables" on a GPIO expander page documents its pin schema
+      const ref = `${this.componentRef.split(".")[0]}.pin`;
+      if (await store.exists(ref)) {
+        await this.openSection(ref, node.depth, line, "heading");
+        return;
+      }
+    }
 
     if (this.section) this.section.enumProp = null;
     // A marker applies to the section right after it; a second heading means it was not used
@@ -1552,36 +1576,61 @@ export class Walker {
       if (node.depth <= this.section.depth) this.section.interrupted = true;
     }
 
-    const trigPath = triggerHeading(node);
-    const trig = trigPath?.split(".").pop();
-    if (trig) {
+    const trigPaths = triggerHeading(node);
+    if (trigPaths) {
       // The page's own schema is tried after the current one: a hub documents its triggers after
-      // the sections of its platforms. nestedInner sees through a docs-only copy of an inherited trigger.
-      // "`vane.on_state`" is first read as the nested key path vane/on_state, then as the component-qualified
-      // name "time.on_time", whose last word is the trigger
+      // the sections of its platforms. "`vane.on_state`" is first read as the nested key path
+      // vane/on_state, then as the component-qualified name "time.on_time", whose last word is the trigger.
+      // A trigger without options of its own still exists: the heading documents it, and the text under it
+      // is not the page schema's.
       const pageRef = this.pageDefault?.defaultRef;
-      const nestedPath = trigPath.split(".").slice(0, -1);
       // "### `on_done` Trigger" under "## `foo.do` Action" is the action's trigger before the component's
       const ownerDepth = this.section?.ownerDepth ?? this.section?.depth;
       const sectionRef = this.section && node.depth > ownerDepth ? this.section.ref : null;
       const refs = [sectionRef, this.defaultRef, pageRef].filter((r, i, all) => r && all.indexOf(r) === i);
-      for (const ref of refs) {
-        if (!ref) continue;
-        for (const path of nestedPath.length ? [nestedPath, []] : [[]]) {
-          const holder = path.length ? `${ref}/${path.join("/")}` : ref;
-          if (!(await store.nestedInner(await store.resolve(holder), trig))) continue;
-          this.markDocumented(holder, trig, line);
-          await this.openSection(`${holder}/${trig}`, node.depth, line, "heading");
-          return;
+      const missing = [];
+      let opened = false;
+      for (const trigPath of trigPaths) {
+        const trig = trigPath.split(".").pop();
+        const nestedPath = trigPath.split(".").slice(0, -1);
+        let hit = null;
+        for (const ref of refs) {
+          for (const path of nestedPath.length ? [nestedPath, []] : [[]]) {
+            const holder = path.length ? `${ref}/${path.join("/")}` : ref;
+            const resolved = await store.resolve(holder);
+            const inner = await store.nestedInner(resolved, trig);
+            if (!inner && (await store.findProp(resolved, trig))?.type !== "trigger") continue;
+            hit = { holder, inner };
+            break;
+          }
+          if (hit) break;
         }
+        if (!hit) {
+          missing.push(trig);
+          continue;
+        }
+        this.markDocumented(hit.holder, trig, line);
+        if (!opened && hit.inner) {
+          await this.openSection(`${hit.holder}/${trig}`, node.depth, line, "heading");
+          opened = true;
+        }
+      }
+      if (missing.length < trigPaths.length) {
+        if (!opened) {
+          await this.closeSection();
+          this.holdEmit = node.depth;
+        }
+        return;
       }
       // Platform index pages document triggers the bundle does not place under the platform's schemas;
       // their options are neither written nor audited, since the text may belong to another trigger's key of
       // the same name. On a component page the options are not the component's: drop them until this
       // heading's subtree ends, as for an unknown action
-      this.report.add("unresolved_trigger", this.rel, line, {
-        detail: `trigger '${trig}' not under ${this.defaultRef}`,
-      });
+      for (const trig of missing) {
+        this.report.add("unresolved_trigger", this.rel, line, {
+          detail: `trigger '${trig}' not under ${this.defaultRef}`,
+        });
+      }
       if (this.defaultRef && !this.defaultRef.endsWith(".*")) {
         this.pendingRegistry = null;
         await this.closeSection();
@@ -2020,11 +2069,18 @@ export class Walker {
   async items(listNode, inner, documented, ref = this.section?.ref) {
     const { store, report } = this;
     let siblingListReported = false;
+    // A list of `value` (note) items with no **key** bullet at all is a value list in prose, not options
+    const hasOptionBullet = listNode.children.some((i) => {
+      const p = parseItem(i);
+      return p && !p.prose;
+    });
     for (const item of listNode.children) {
       this.lastEnumProps = [];
       const parsed = parseItem(item);
       if (!parsed || parsed.prose) {
-        if (parsed?.optionality || (!parsed && LOOKS_LIKE_OPTION_RE.test(itemText(this.tree, item)))) {
+        const text = itemText(this.tree, item);
+        const optionLike = OPTIONALITY_IN_TEXT_RE.test(text) || (hasOptionBullet && CODE_KEY_BULLET_RE.test(text));
+        if (parsed?.optionality || (!parsed && optionLike)) {
           // "`baud_rate` (**Required**, int): ..." or a key that is not lower snake_case
           report.add("malformed_prop_bullet", this.rel, item.position.start.line, {
             key: parsed?.key ?? itemText(this.tree, item).match(/^`([^`]+)`/)?.[1] ?? "",
@@ -2141,6 +2197,11 @@ export class Walker {
         const childInner = { variants: found.children, multi: true };
         this.lastEnumProps = await this.enumHolders(childInner, parsed.key, childFound);
         await this.nestedContent(item, childInner, parsed.key, childFound, ref);
+        continue;
+      }
+      if (!found && parsed.key === "platform") {
+        // Index pages document the platform selector itself, which no schema carries
+        report.stats.proseBullets++;
         continue;
       }
       if (!found) {

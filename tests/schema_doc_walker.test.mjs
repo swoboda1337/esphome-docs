@@ -1159,7 +1159,7 @@ test("a platform index without a base schema does not get platform keys created 
       esphome: core(["foo"], { gizmo: {} }),
       gizmo: {
         gizmo: {
-          schemas: { BASIC_GIZMO_SCHEMA: schema({ name: { key: "Optional" } }) },
+          schemas: { GIZMO_EXTRA_SCHEMA: schema({ name: { key: "Optional" } }) },
           components: { foo: {} },
         },
       },
@@ -1175,7 +1175,7 @@ test("a platform index without a base schema does not get platform keys created 
       ].join("\n\n"),
     },
   });
-  const basic = store.files.get("gizmo").gizmo.schemas.BASIC_GIZMO_SCHEMA.schema.config_vars;
+  const basic = store.files.get("gizmo").gizmo.schemas.GIZMO_EXTRA_SCHEMA.schema.config_vars;
   assert.match(basic.name.docs, /The name/);
   assert.equal(basic.speed, undefined);
   assert.deepEqual(
@@ -2546,4 +2546,208 @@ test("an unresolved heading under an action does not leave the action's options 
   });
   assert.match(docs("foo", "foo", "action", "do", "schema", "config_vars", "mode"), /action's mode/);
   assert.equal(report.findings.filter((f) => f.kind === "unresolved_component_heading").length, 1);
+});
+
+test("a base schema may carry a qualifier, as in BASIC_DISPLAY_SCHEMA or FLOAT_OUTPUT_SCHEMA", async () => {
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["foo"], { gizmo: {} }),
+      gizmo: {
+        gizmo: {
+          schemas: { BASIC_GIZMO_SCHEMA: schema({ name: { key: "Optional" } }) },
+          components: { foo: {} },
+        },
+      },
+      foo: { "foo.gizmo": { schemas: { CONFIG_SCHEMA: schema({ speed: { key: "Optional" } }) } } },
+    },
+    pages: {
+      "gizmo/index.mdx": [
+        "Gizmos.",
+        "## Base Gizmo Configuration",
+        "- **name** (*Optional*, string): The name.",
+        "- **speed** (*Optional*, int): The speed.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const basic = store.files.get("gizmo").gizmo.schemas.BASIC_GIZMO_SCHEMA.schema.config_vars;
+  assert.match(basic.name.docs, /The name/);
+  // A key only the platforms declare is described on the base, as on every platform index with a base
+  assert.match(basic.speed.docs, /The speed/);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind === "missing_base_schema" || f.kind === "unmatched_key"),
+    [],
+  );
+});
+
+test("a heading naming several triggers documents each, with or without options of their own", async () => {
+  const bare = { key: "Optional", type: "trigger" };
+  const { report } = await walk({
+    schema: {
+      esphome: core(["foo"]),
+      foo: {
+        foo: {
+          schemas: {
+            CONFIG_SCHEMA: schema({ id: { key: "GeneratedID" }, on_turn_on: bare, on_turn_off: bare, on_state: bare }),
+          },
+        },
+      },
+    },
+    pages: {
+      "foo.mdx": [
+        "Foo.",
+        "## Configuration variables",
+        "- **id** (*Optional*, ID): The id.",
+        "## `foo.on_turn_on` / `foo.on_turn_off` Trigger",
+        "Fires when the foo turns on or off.",
+        "- **x** (*Optional*, float): A lambda variable, not an option of the page schema.",
+        "## `on_state` Trigger",
+        "Fires on every state change.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  assert.deepEqual(
+    report.findings
+      .filter((f) => ["unresolved_trigger", "undocumented_key", "unmatched_key", "orphan_option_list"].includes(f.kind))
+      .map((f) => [f.kind, f.key]),
+    [],
+  );
+});
+
+test("enum values documented with quotes, spaces or another case still match", async () => {
+  const values = (...names) => Object.fromEntries(names.map((n) => [n, null]));
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["foo"]),
+      foo: {
+        foo: {
+          schemas: {
+            CONFIG_SCHEMA: schema({
+              state: { key: "Optional", type: "enum", values: values("OFF", "ON") },
+              model: { key: "Optional", type: "enum", values: values("TFT_2.4", "TFT_2.4R") },
+            }),
+          },
+        },
+      },
+    },
+    pages: {
+      "foo.mdx": [
+        "Foo.",
+        "## Configuration variables",
+        "- **state** (*Optional*): The state.\n  - `'OFF'`: Off.\n  - `on`: On.",
+        "- **model** (*Optional*): The model.\n  - `TFT 2.4`: Plain.\n  - `TFT 2.4R`: Round.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const vars = store.files.get("foo").foo.schemas.CONFIG_SCHEMA.schema.config_vars;
+  assert.match(vars.state.values.OFF.docs, /Off/);
+  assert.match(vars.state.values.ON.docs, /On/);
+  assert.match(vars.model.values["TFT_2.4R"].docs, /Round/);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind === "unknown_enum_value"),
+    [],
+  );
+});
+
+test("a Pin configuration variables heading documents the pin schema an expander registers", async () => {
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["foo"]),
+      foo: {
+        foo: {
+          schemas: { CONFIG_SCHEMA: schema({ id: { key: "GeneratedID" } }) },
+          pin: schema({ foo: { key: "Required" }, number: { key: "Required" }, inverted: { key: "Optional" } }),
+        },
+      },
+    },
+    pages: {
+      "foo.mdx": [
+        "Foo.",
+        "## Configuration variables",
+        "- **id** (*Optional*, ID): The id.",
+        "## Pin configuration variables",
+        "- **foo** (**Required**, ID): The id of the foo component.",
+        "- **number** (**Required**, int): The pin number.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const pin = store.files.get("foo").foo.pin.schema.config_vars;
+  assert.match(pin.foo.docs, /id of the foo/);
+  assert.match(pin.number.docs, /pin number/);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind !== "undocumented_key").map((f) => [f.kind, f.key]),
+    [],
+  );
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind === "undocumented_key").map((f) => f.key),
+    ["inverted"],
+  );
+});
+
+test("a platform selector bullet and a value list in prose are not options", async () => {
+  const { report } = await walk({
+    schema: {
+      esphome: core(["foo"], { gizmo: {} }),
+      gizmo: { gizmo: { schemas: { GIZMO_SCHEMA: schema({ name: { key: "Optional" } }) }, components: { foo: {} } } },
+      foo: { "foo.gizmo": { schemas: { CONFIG_SCHEMA: schema({ rate: { key: "Optional" } }) } } },
+    },
+    pages: {
+      "gizmo/index.mdx": [
+        "Gizmos.",
+        "## Configuration variables",
+        "- **platform** (**Required**, string): The platform.",
+        "- **name** (*Optional*, string): The name.",
+        "- **rate** (*Optional*): The rate. One of:\n  - `1x` (the default)\n  - `2x` (fast)",
+        "The rate values are:",
+        "- `1x` (the default)",
+        "- `2x` (fast, 2 Hz)",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind === "unmatched_key" || f.kind === "malformed_prop_bullet"),
+    [],
+  );
+});
+
+test("a schema marker with a nested reference routes the section after it", async () => {
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["foo"]),
+      foo: {
+        foo: {
+          schemas: {
+            CONFIG_SCHEMA: schema({
+              id: { key: "GeneratedID" },
+              reg0: { key: "Optional", ...schema({ mode: { key: "Optional" } }) },
+            }),
+          },
+        },
+      },
+    },
+    pages: {
+      "foo.mdx": [
+        "Foo.",
+        "## Configuration variables",
+        "- **id** (*Optional*, ID): The id.",
+        "- **reg0** (*Optional*): The regulator.",
+        "## Regulator",
+        "{/* schema: foo.CONFIG_SCHEMA/reg0 */}",
+        "### Configuration variables",
+        "- **mode** (*Optional*, string): The regulator mode.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const reg0 = store.files.get("foo").foo.schemas.CONFIG_SCHEMA.schema.config_vars.reg0;
+  assert.match(reg0.schema.config_vars.mode.docs, /regulator mode/);
+  assert.equal(report.stats.sectionsByMarker, 1);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind !== "undocumented_key"),
+    [],
+  );
 });
