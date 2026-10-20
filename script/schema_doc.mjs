@@ -653,8 +653,15 @@ const LAST_PAREN_RE = new RegExp(`\\(((?:[^()]|\\([^()]*\\))*)\\)\\s*$`);
 // "(**Required**, ...)" anywhere, and "`key` (" opening a bullet: an option bullet with the wrong markup
 const OPTIONALITY_IN_TEXT_RE = /\(\s*(?:\*\*|\*)?(?:required|optional)\b/i;
 const CODE_KEY_BULLET_RE = /^`[a-z0-9_]+`\s*\(/;
-const PROP_RE = new RegExp(`^\\*\\*(\\w+)\\*\\*(?::\\s*${TYPE_GROUP}(?::\\s*|\\s+|$)|(?: ${TYPE_GROUP})?: )(.*)$`);
-const ENUM_RE = /^(?:`([^`]*)`|\*\*([^*]*)\*\*)\s*(?:(?:-|:)\s*(.*)|\(([^)]*)\)(?:\s*(?::|-)\s*(.*))?)?$/;
+// **a**, **b** and **c** (type): one bullet for several keys; **a/b** names two
+const KEYS = "(\\*\\*[\\w/]+\\*\\*(?:\\s*(?:,|/|,?\\s*and|,?\\s*or)\\s*\\*\\*[\\w/]+\\*\\*)*)";
+const KEY_SEPARATOR_RE = /^\s*(?:,|\/|,?\s*and|,?\s*or)\s*$/;
+const PROP_RE = new RegExp(`^${KEYS}(?::\\s*${TYPE_GROUP}(?::\\s*|\\s+|$)|(?:\\s+${TYPE_GROUP})?: )(.*)$`);
+// `value`: text, `value` - text, `value` (note), `value` text, **value**: text; also ``value`` as RST left it
+const ENUM_RE =
+  /^(?:``(?<v2>[^`]+)``|`(?<v1>[^`]*)`|\*\*(?<v3>[^*]*)\*\*)(?:\s*(?:-|:|—|–)\s*(?<d1>.*)|\s*\((?<note>[^)]*)\)(?:\s*(?::|-|—|–)\s*(?<d2>.*)|\s+(?<d3>.*))?|\s+(?<d4>.*))?$/;
+// "Options are: `a`, `b` or `c`." / "ESP32-C3: `80MHz`, `160MHz`": several values, a note at most
+const ENUM_VALUES_RE = /^(?:[^`]*:\s*)?(?:`[^`]+`(?:\s*,\s*|\s*\/\s*|,?\s+(?:or|and)\s+))+`[^`]+`\s*(?:\([^)]*\))?\.?$/;
 
 /** <EnumValues values={[ {value: "X", default: true, description: "Y"}, … ]} /> */
 const ENUM_VALUE_FIELDS = ["value", "description", "default"];
@@ -744,16 +751,23 @@ function bareCodeHeading(node) {
 export function parseItem(item) {
   const para = item.children.find((c) => c.type === "paragraph");
   if (!para) return null;
-  const [first, ...rest] = para.children;
+  let [first, ...rest] = para.children;
   if (!first || first.type !== "strong") return null;
   const key = toString(first).trim();
+  // **user_1**, **user_2** (type): one bullet documents several keys; **a/b** too
+  const keys = key.split("/");
+  while (rest[0]?.type === "text" && KEY_SEPARATOR_RE.test(rest[0].value) && rest[1]?.type === "strong") {
+    keys.push(...toString(rest[1]).trim().split("/"));
+    rest = rest.slice(2);
+  }
   const line = para.position.start.line;
   let optionality = null;
   // Expected shape: **key** (**Required**, type): ...  /  **key** (*Optional*, type): ...
-  // A header bullet "**key**: (*Optional*, list)" introduces a nested list with no text of its own.
+  // A header bullet "**key**: (*Optional*, list)" or "**key** (*Optional*, list)" introduces a nested list
+  // with no text of its own.
   const colonParen = rest[0]?.type === "text" && /^:\s*\(\s*$/.test(rest[0].value);
-  const header = colonParen && /\)\s*$/.test(toString(para));
-  const hasParen = header || (rest[0]?.type === "text" && /^\s*\(/.test(rest[0].value));
+  const header = /^\S+:?\s*\((?:[^()]|\([^()]*\))*\):?$/.test(toString(para).trim());
+  const hasParen = header || colonParen || (rest[0]?.type === "text" && /^\s*\(/.test(rest[0].value));
   if (rest[0]?.type === "text" && /^:?\s*\(\s*$/.test(rest[0].value)) {
     const marker = rest[1];
     if (marker && (marker.type === "strong" || marker.type === "emphasis")) {
@@ -765,9 +779,10 @@ export function parseItem(item) {
     const m = rest[0].value.match(/^:?\s*\(\s*(required|optional)\b/i);
     if (m) optionality = m[1].toLowerCase();
   }
-  // YAML keys are lower snake_case; `target_N` / `gX` stand for numbered families
-  const prose = !/^[a-z0-9_]+[NX]?$/.test(key);
-  return { key, optionality, hasParen, header, prose, line };
+  // YAML keys are lower snake_case; `target_N` / `gX` stand for numbered families. "**on/off** -> ..." in prose
+  // names no keys
+  const prose = !keys.every((k) => /^[a-z0-9_]+[NX]?$/.test(k)) || (key.includes("/") && !hasParen);
+  return { key: keys[0], keys, optionality, hasParen, header, prose, line };
 }
 
 export class Report {
@@ -1354,23 +1369,42 @@ export class Walker {
     for (const item of listNode.children) {
       if (!item.children.some((c) => c.type === "paragraph")) continue;
       const line = item.position.start.line;
-      const m = ENUM_RE.exec(itemText(this.tree, item));
+      const text = itemText(this.tree, item);
+      if (ENUM_VALUES_RE.test(text)) {
+        // Several values named in one bullet: each must exist; none gets a description
+        for (const [, value] of text.matchAll(/`([^`]+)`/g)) {
+          if (this.enumHoldersOf(enums, value).length) continue;
+          this.report.add("unknown_enum_value", this.rel, line, {
+            key: value,
+            detail: `not one of ${this.enumChoices(enums)}`,
+          });
+        }
+        continue;
+      }
+      const m = ENUM_RE.exec(text);
       if (!m) {
         this.report.add("malformed_enum_bullet", this.rel, line, { detail: "expected `value`: description" });
         continue;
       }
-      const holders = this.enumHoldersOf(enums, m[1] ?? m[2]);
-      const note = m[4];
+      const { v1, v2, v3, note, d1, d2, d3, d4 } = m.groups;
+      const value = v1 ?? v2 ?? v3;
+      const holders = this.enumHoldersOf(enums, value);
+      const isDefaultWord = (t) => /^\*{0,2}default\*{0,2}$/i.test(t.trim());
       // "(default)" or "(*default*)" after the value
-      const noteDefault = note !== undefined && /^\*{0,2}default\*{0,2}$/i.test(note.trim());
-      let desc = m[3] ?? m[5] ?? (noteDefault ? undefined : note);
-      // "(default)" after the value, or a description that is only the word, marks the default value
-      const descDefault = desc !== undefined && /^\*{0,2}default\*{0,2}$/i.test(desc.trim());
+      const noteDefault = note !== undefined && isDefaultWord(note);
+      let desc = d1 ?? d2 ?? d3 ?? d4 ?? (noteDefault ? undefined : note);
+      // "(default)" after the value, a description that is only the word, or one ending in "(**Default**)"
+      let descDefault = desc !== undefined && isDefaultWord(desc);
       if (descDefault) desc = undefined;
+      const trailing = desc?.match(/^(.*?)\s*\((\*{0,2}default\*{0,2})\)\.?$/i);
+      if (trailing) {
+        desc = trailing[1] || undefined;
+        descDefault = true;
+      }
       const isDefault = noteDefault || descDefault;
       if (!holders.length) {
         this.report.add("unknown_enum_value", this.rel, line, {
-          key: m[1] ?? m[2],
+          key: value,
           detail: `not one of ${this.enumChoices(enums)}`,
         });
         continue;
@@ -1391,7 +1425,7 @@ export class Walker {
     const m = PROP_RE.exec(itemText(this.tree, item));
     if (!m) return;
     const typeText = (m[2] ?? m[3])?.match(LAST_PAREN_RE)?.[1];
-    const docText = m[4];
+    const docText = m[4] ?? "";
     if (found.typedEntries) {
       for (const entry of found.typedEntries) entry.docs = this.withSeeAlso(docText);
       this.report.stats.emitted.props++;
@@ -1511,9 +1545,14 @@ export class Walker {
     // heading ("### Signed OTA Verification") is often followed by the bullet of the key itself; it stays
     // with the parent schema, where the bullet matches
     if (isCode && this.defaultRef && !this.defaultRef.includes("+")) {
+      // widgets/table over pages/widgets/table: the shallowest path, and among those the fullest definition
+      // (lvgl's theme/table holds only the style part of widgets/table)
       const paths = await store.findNestedPaths(await store.resolve(this.defaultRef), name);
-      if (paths.length === 1) return `${this.defaultRef}/${paths[0].join("/")}`;
-      if (paths.length > 1) return null;
+      const shortest = Math.min(...paths.map((path) => path.length));
+      const nearest = paths
+        .filter((path) => path.length === shortest)
+        .map((path) => `${this.defaultRef}/${path.join("/")}`);
+      if (nearest.length) return this.fullest_(nearest);
     }
     const hits = [];
     for (const schemaName of await store.schemaNames(this.componentRef)) {
@@ -1528,7 +1567,16 @@ export class Walker {
         }
       }
     }
-    return hits.length === 1 ? hits[0] : null;
+    return this.fullest_(hits);
+  }
+
+  /** The one reference among these whose schema has the most keys, or null when two tie. */
+  async fullest_(refs) {
+    if (refs.length === 1) return refs[0];
+    const sized = [];
+    for (const ref of refs) sized.push([ref, this.store.ownKeys(await this.store.resolve(ref)).size]);
+    sized.sort((a, b) => b[1] - a[1]);
+    return sized.length && sized[0][1] > (sized[1]?.[1] ?? -1) ? sized[0][0] : null;
   }
 
   /** A {/* schema: ref *\/} marker: remember it for the next section. */
@@ -2049,23 +2097,35 @@ export class Walker {
       }
     }
 
-    // `prop` sub-heading inside an open section: describe a nested schema
-    if (code && this.section && node.depth > this.section.depth) {
-      const prop = await store.findProp(this.section.inner, code);
+    // `prop` sub-heading inside an open section: describe a nested schema. "#### Linear gradients" under the
+    // gradients section is its `linear` key
+    if (this.section && node.depth > this.section.depth) {
+      let sub = code;
+      if (!sub) {
+        const words = slug(text);
+        for (const w of [words, words.split("_")[0]]) {
+          if (w && (await store.nestedInner(this.section.inner, w))) {
+            sub = w;
+            break;
+          }
+        }
+        if (!sub) return;
+      }
+      const prop = await store.findProp(this.section.inner, sub);
       if (prop?.type === "enum") {
         this.lastEnumProps = [prop];
         this.section.enumProp = prop;
-        this.section.documented.add(code);
+        this.section.documented.add(sub);
         return;
       }
-      const inner = await store.nestedInner(this.section.inner, code);
+      const inner = await store.nestedInner(this.section.inner, sub);
       if (inner) {
-        this.section.documented.add(code);
+        this.section.documented.add(sub);
         this.section = {
           ...this.section,
           inner,
-          ref: `${this.section.ref}/${code}`,
-          members: this.section.members ? await this.nestedMembers_(this.section.members, code, line) : undefined,
+          ref: `${this.section.ref}/${sub}`,
+          members: this.section.members ? await this.nestedMembers_(this.section.members, sub, line) : undefined,
           depth: node.depth,
           documented: new Set(),
           parent: this.section,
@@ -2291,6 +2351,26 @@ export class Walker {
       if (!found && this.section?.continued && inner === this.section.inner && !parsed.hasParen) {
         // After an unrelated heading, a bare "**word**: text" bullet is prose unless it names a key
         report.stats.proseBullets++;
+        continue;
+      }
+      if (parsed.keys.length > 1) {
+        const members = await Promise.all(parsed.keys.map((k) => store.findPropOwner(inner, k)));
+        if (members.every(Boolean)) {
+          report.stats.keysMatched++;
+          this.checkBullet(item, parsed);
+          for (const [i, k] of parsed.keys.entries()) {
+            documented.add(k);
+            await this.checkOptionality(inner, parsed, k);
+            await this.emitPropDocs(members[i], inner, item, { ...parsed, key: k });
+            await this.nestedContent(item, inner, k, members[i], ref);
+          }
+          continue;
+        }
+        for (const [i, k] of parsed.keys.entries()) {
+          if (members[i]) continue;
+          report.stats.keysUnmatched++;
+          report.add("unmatched_key", this.rel, parsed.line, { schema: this.section?.ref, key: k });
+        }
         continue;
       }
       if (!found) {

@@ -3010,3 +3010,126 @@ test("a key that is an enum or a mapping takes option bullets for the mapping an
     [],
   );
 });
+
+test("one bullet naming several keys documents each of them", async () => {
+  const flag = { key: "Optional", type: "boolean" };
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["foo"]),
+      foo: {
+        foo: {
+          schemas: {
+            CONFIG_SCHEMA: schema({
+              user_1: flag,
+              user_2: flag,
+              min_width: flag,
+              max_width: flag,
+              threshold_high: flag,
+              threshold_low: flag,
+            }),
+          },
+        },
+      },
+    },
+    pages: {
+      "foo.mdx": [
+        "Foo.",
+        "## Configuration variables",
+        "- **user_1**, **user_2** (*Optional*, boolean): Custom states.",
+        "- **min_width** and **max_width** (*Optional*, int): Size limits.",
+        "- **threshold_high/threshold_low** (**Required**, float): Hysteresis.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const vars = store.files.get("foo").foo.schemas.CONFIG_SCHEMA.schema.config_vars;
+  for (const [key, text] of [
+    ["user_1", /Custom states/],
+    ["user_2", /Custom states/],
+    ["min_width", /Size limits/],
+    ["max_width", /Size limits/],
+    ["threshold_high", /Hysteresis/],
+    ["threshold_low", /Hysteresis/],
+  ]) {
+    assert.match(vars[key].docs, text, key);
+  }
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind !== "optionality_mismatch"),
+    [],
+  );
+});
+
+test("a header bullet with a type and no text of its own introduces its nested list", async () => {
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["foo"]),
+      foo: {
+        foo: {
+          schemas: {
+            CONFIG_SCHEMA: schema({
+              clk: { key: "Required", ...schema({ pin: { key: "Required" }, mode: { key: "Optional" } }) },
+            }),
+          },
+        },
+      },
+    },
+    pages: {
+      "foo.mdx": [
+        "Foo.",
+        "## Configuration variables",
+        ["- **clk** (**Required**, mapping):", "  - **pin** (**Required**, pin): The clock pin."].join("\n"),
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const clk = store.files.get("foo").foo.schemas.CONFIG_SCHEMA.schema.config_vars.clk;
+  assert.match(clk.schema.config_vars.pin.docs, /clock pin/);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind !== "undocumented_key"),
+    [],
+  );
+});
+
+test("enum value bullets: a space or dash before the text, several values at once, RST double backticks", async () => {
+  const values = (...names) => Object.fromEntries(names.map((n) => [n, null]));
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["foo"]),
+      foo: {
+        foo: {
+          schemas: {
+            CONFIG_SCHEMA: schema({
+              mode: { key: "Optional", type: "enum", values: values("avg", "min", "max") },
+              model: { key: "Optional", type: "enum", values: values("A1", "A2", "B1", "CUSTOM") },
+              format: { key: "Optional", type: "enum", values: values("jpeg", "raw") },
+              swing: { key: "Optional", type: "enum", values: values("OFF", "BOTH") },
+            }),
+          },
+        },
+      },
+    },
+    pages: {
+      "foo.mdx": [
+        "Foo.",
+        "## Configuration variables",
+        "- **mode** (*Optional*): The mode.\n  - `avg` average of all samples (**Default**)\n  - `min` (slow) the lowest\n  - `max` the highest",
+        "- **model** (*Optional*): The model.\n  - `A1`, `A2`\n  - Options are: `B1` or `CUSTOM`.",
+        "- **format** (*Optional*): The format.\n  - ``jpeg``: Compressed.\n  - ``raw``: Not.",
+        "- **swing** (*Optional*): Swing.\n  - `'OFF'` — no swing\n  - `BOTH` – both axes",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const vars = store.files.get("foo").foo.schemas.CONFIG_SCHEMA.schema.config_vars;
+  assert.match(vars.mode.values.avg.docs, /^average of all samples$/);
+  assert.equal(vars.mode.values.avg.default, true);
+  assert.match(vars.mode.values.min.docs, /the lowest/);
+  assert.match(vars.mode.values.max.docs, /the highest/);
+  assert.match(vars.format.values.jpeg.docs, /Compressed/);
+  assert.match(vars.swing.values.OFF.docs, /no swing/);
+  assert.match(vars.swing.values.BOTH.docs, /both axes/);
+  assert.deepEqual(
+    report.findings.filter((f) => ["malformed_enum_bullet", "unknown_enum_value"].includes(f.kind)),
+    [],
+  );
+});
