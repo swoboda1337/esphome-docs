@@ -182,7 +182,12 @@ export class SchemaStore {
     if (ref.includes("/")) {
       const [base, ...props] = ref.split("/");
       let inner = await this.resolve(base);
-      for (const prop of props) inner = await this.nestedInner(inner, prop);
+      for (const prop of props) {
+        // items[label]: one variant of a typed nested key
+        const m = prop.match(/^([^[]+)\[([^\]]+)\]$/);
+        inner = await this.nestedInner(inner, m ? m[1] : prop);
+        if (m && inner) inner = inner.entry ? toInner(inner.entry, m[2]) : null;
+      }
       return inner;
     }
     if (ref.includes("+")) {
@@ -467,6 +472,26 @@ export class SchemaStore {
     }
     this.childrenCache.set(baseTop, children);
     return children;
+  }
+
+  /** The key paths (["widgets", "arc"]) at which `name` opens a sub-schema one or two levels below this one. */
+  async findNestedPaths(inner, name, depth = 2, seen = new Set(), prefix = []) {
+    const found = [];
+    if (!inner || depth === 0) return found;
+    for (const variantInner of inner.variants) {
+      for (const [key, child] of Object.entries(variantInner.config_vars ?? {})) {
+        const childInner = propInner(child);
+        if (!childInner) continue;
+        if (await this.nestedInner(childInner, name)) found.push([...prefix, key, name]);
+        found.push(...(await this.findNestedPaths(childInner, name, depth - 1, seen, [...prefix, key])));
+      }
+      for (const ext of variantInner.extends ?? []) {
+        if (seen.has(ext)) continue;
+        seen.add(ext);
+        found.push(...(await this.findNestedPaths(await this.resolveExtends(ext), name, depth, seen, prefix)));
+      }
+    }
+    return found.filter((path, i) => found.findIndex((q) => q.join("/") === path.join("/")) === i);
   }
 
   /** Look for a key one or two levels below this schema (documented flat). */
@@ -806,6 +831,7 @@ export class Walker {
     this.tree = null;
     this.rel = relative(componentsRoot, file).replace(/\\/g, "/");
     this.switchDepth = null; // depth of the heading that re-targeted defaultRef
+    this.subPage = false; // lvgl/widgets.mdx: a page of its folder's component, with no intro of its own
     this.stem = basename(file, ".mdx");
     this.folder = basename(dirname(file));
     this.section = null; // { inner, ref, depth, documented:Set, subStack:[] }
@@ -848,11 +874,41 @@ export class Walker {
       const platform = basename(dirname(dirname(this.file)));
       this.componentRef = platform;
       this.defaultRef = `${platform}.filter.${this.stem}`;
+    } else if (
+      this.folder !== "components" &&
+      this.stem !== "index" &&
+      (await store.knownComponent(this.folder)) &&
+      ((await this.namedSchemaRef(this.folder, this.stem)) || !(await store.knownComponent(this.stem)))
+    ) {
+      // lvgl/animation.mdx documents lvgl's ANIMATION_SCHEMA, lvgl/widgets.mdx the lvgl component itself;
+      // display_menu/lcd_menu.mdx stays the lcd_menu component's page. Such a page has no intro of its own
+      this.componentRef = this.folder;
+      this.subPage = true;
+      this.defaultRef =
+        (await this.namedSchemaRef(this.folder, this.stem)) ?? (await this.componentSchemaRef(this.folder));
     } else {
-      const comp = this.stem === "index" ? this.folder : this.stem;
+      let comp = this.stem === "index" ? this.folder : this.stem;
+      let ref = await this.componentSchemaRef(comp);
+      if (!ref && (await store.knownComponent(`${comp}_base`))) {
+        // display_menu/index.mdx documents what lcd_menu and graphical_display_menu share: display_menu_base,
+        // which is no YAML key, so the page intro has nowhere to go
+        comp = `${comp}_base`;
+        ref = (await this.componentSchemaRef(comp)) ?? (await this.namedSchemaRef(comp, comp));
+        this.subPage = ref !== null;
+      }
       this.componentRef = comp;
-      this.defaultRef = await this.componentSchemaRef(comp);
+      this.defaultRef = ref;
     }
+  }
+
+  /** comp.NAME_SCHEMA for a page or component name, singular or plural ("layouts" -> LAYOUT_SCHEMA). */
+  async namedSchemaRef(comp, name) {
+    const upper = slug(name).toUpperCase();
+    for (const candidate of new Set([upper, upper.replace(/S$/, "")])) {
+      const ref = `${comp}.${candidate}_SCHEMA`;
+      if (await this.store.exists(ref)) return ref;
+    }
+    return null;
   }
 
   /** foo.CONFIG_SCHEMA, or the union of foo_i2c/foo_spi when foo itself has none. */
@@ -1422,6 +1478,7 @@ export class Walker {
       } else if (
         this.componentRef !== "core" &&
         this.folder !== "filter" &&
+        !this.subPage &&
         (this.stem !== "index" || this.folder !== "components")
       ) {
         await this.emitComponentDocs(this.stem === "index" ? this.folder : this.stem, null, text);
@@ -1441,6 +1498,37 @@ export class Walker {
     await this.closeSection();
     this.reportAudits();
     this.dropMarker();
+  }
+
+  /**
+   * The unique sub-schema `name` is under the page component's named schemas: a nested key
+   * (lvgl.WIDGET_TYPES/arc) or a variant of a typed key (display_menu_base.MENU_TYPES/items[label]).
+   */
+  async siblingSchemaRef_(name, isCode) {
+    const { store } = this;
+    if (!name || !this.componentRef || this.componentRef === "core" || !/^[a-z0-9_]+$/.test(name)) return null;
+    // Two levels down the page's own schema first: "### `arc`" -> lvgl.CONFIG_SCHEMA/widgets/arc. A word
+    // heading ("### Signed OTA Verification") is often followed by the bullet of the key itself; it stays
+    // with the parent schema, where the bullet matches
+    if (isCode && this.defaultRef && !this.defaultRef.includes("+")) {
+      const paths = await store.findNestedPaths(await store.resolve(this.defaultRef), name);
+      if (paths.length === 1) return `${this.defaultRef}/${paths[0].join("/")}`;
+      if (paths.length > 1) return null;
+    }
+    const hits = [];
+    for (const schemaName of await store.schemaNames(this.componentRef)) {
+      if (schemaName === "CONFIG_SCHEMA" || /_(ACTION|CONDITION)_SCHEMA$/.test(schemaName)) continue;
+      const ref = `${this.componentRef}.${schemaName}`;
+      const inner = await store.resolve(ref);
+      if (!inner) continue;
+      if (await store.nestedInner(inner, name)) hits.push(`${ref}/${name}`);
+      for (const variant of inner.variants) {
+        for (const [key, prop] of Object.entries(variant.config_vars ?? {})) {
+          if (prop?.type === "typed" && prop.types?.[name]) hits.push(`${ref}/${key}[${name}]`);
+        }
+      }
+    }
+    return hits.length === 1 ? hits[0] : null;
   }
 
   /** A {/* schema: ref *\/} marker: remember it for the next section. */
@@ -1814,6 +1902,36 @@ export class Walker {
       ) {
         platformName = singular;
       }
+      if (!store.isPlatform(platformName)) {
+        // "## Knob's position sensor" names its platform last; "### Sensor, Text Sensor, and Binary Sensor"
+        // names several, whose schemas the section then covers together
+        const named = [];
+        const words = platformName.split("_");
+        for (let i = 0; i < words.length; i++) {
+          const pair = words
+            .slice(i, i + 2)
+            .join("_")
+            .replace(/s$/, "");
+          const single = words[i].replace(/s$/, "");
+          const hit = [pair, single].find((w) => store.isPlatform(w) && w !== "" && !named.includes(w));
+          if (!hit) continue;
+          named.push(hit);
+          if (hit === pair) i++;
+        }
+        const refs = [];
+        for (const name of named) {
+          const ref = await this.componentSchemaRef(owner, name);
+          if (ref) refs.push(ref);
+        }
+        if (refs.length > 1 && refs.length === named.length) {
+          await this.closeSection();
+          this.defaultRef = refs.join("+");
+          this.componentRef = `${owner}.${named[0]}`;
+          this.switchDepth = node.depth;
+          return;
+        }
+        if (refs.length === 1 && named.length === 1) platformName = named[0];
+      }
       if (store.isPlatform(platformName)) {
         const ref = await this.componentSchemaRef(owner, platformName);
         if (ref) {
@@ -1905,6 +2023,28 @@ export class Walker {
         } else {
           await this.openSection(`${baseRef}/${first}`, node.depth, line, "heading");
         }
+        return;
+      }
+    }
+
+    // "### `arc`" among lvgl's widgets is a key of WIDGET_TYPES; "### Label" on the display menu page a
+    // variant of MENU_TYPES' typed items; "### Color" on the display page the color component
+    const blockedByFailed = this.failedSection && node.depth > this.failedSection.depth;
+    if (!(code && this.section && node.depth > this.section.depth) && !blockedByFailed) {
+      const sibling = await this.siblingSchemaRef_(code ?? slug(text), code !== null);
+      if (sibling) {
+        await this.openSection(sibling, node.depth, line, "heading");
+        return;
+      }
+      const other = slug(text);
+      if (
+        !code &&
+        other !== this.componentRef?.split(".")[0] &&
+        !store.isPlatform(other) &&
+        store.isComponent(other) &&
+        (await store.exists(`${other}.CONFIG_SCHEMA`))
+      ) {
+        await this.openSection(`${other}.CONFIG_SCHEMA`, node.depth, line, "heading");
         return;
       }
     }
@@ -2005,20 +2145,31 @@ export class Walker {
     const props = holders.length ? holders.map((h) => h.prop) : [found.prop];
     const line = item.position.start.line;
     const nestedRef = `${ref}/${key}`;
-    const nested = props.map((prop) => propInner(prop)).filter(Boolean);
+    // `transform` is "disabled" or a mapping: its **key** bullets document the mapping, the rest the enum
+    const union = props.filter((prop) => prop?.type === "enum" && toInner(prop));
+    const isOption = (item) => {
+      const parsed = parseItem(item);
+      return parsed && !parsed.prose;
+    };
+    const split = (keep) => lists.map((list) => ({ ...list, children: list.children.filter(keep) }));
+    const optionLists = union.length ? split(isOption) : lists;
+    const valueLists = union.length ? split((item) => !isOption(item)) : lists;
+    const nested = props
+      .map((prop) => propInner(prop) ?? (union.includes(prop) ? toInner(prop) : null))
+      .filter(Boolean);
     if (nested.length) {
       // One walk over the definitions of every variant, so a key only one of them has is matched there
       // and not reported unmatched on the others; each definition is still audited for keys the docs miss
       const merged = nested.length === 1 ? nested[0] : await this.store.nestedInner(inner, key);
       const documented = new Set();
-      for (const list of lists) await this.items(list, merged, documented, nestedRef);
+      for (const list of optionLists) if (list.children.length) await this.items(list, merged, documented, nestedRef);
       for (const nestedInner of nested)
         this.reportUndocumented({ inner: nestedInner, documented, ref: nestedRef, line });
     }
     const flat = props.filter((prop) => !propInner(prop));
     const enums = flat.filter((prop) => prop.type === "enum");
     if (enums.length) {
-      for (const list of lists) this.emitEnumList(enums, list);
+      for (const list of valueLists) if (list.children.length) this.emitEnumList(enums, list);
     } else if (lists.length && flat.length) {
       this.report.add("nested_list_ignored", this.rel, line, {
         key,

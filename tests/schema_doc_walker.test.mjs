@@ -2751,3 +2751,262 @@ test("a schema marker with a nested reference routes the section after it", asyn
     [],
   );
 });
+
+test("a page in a component's folder documents that component's schema named like the page", async () => {
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["lvgl", "animation"]),
+      animation: { animation: { schemas: { CONFIG_SCHEMA: schema({ file: { key: "Required" } }) } } },
+      lvgl: {
+        lvgl: {
+          schemas: {
+            CONFIG_SCHEMA: schema({ id: { key: "GeneratedID" } }),
+            ANIMATION_SCHEMA: schema({ duration: { key: "Optional" } }),
+          },
+        },
+      },
+    },
+    pages: {
+      "lvgl/animation.mdx": [
+        "LVGL animations.",
+        "## Configuration variables",
+        "- **duration** (*Optional*, Time): How long one run takes.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  assert.match(store.files.get("lvgl").lvgl.schemas.ANIMATION_SCHEMA.schema.config_vars.duration.docs, /one run/);
+  assert.equal(store.core.components.animation.docs, undefined);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind !== "undocumented_key"),
+    [],
+  );
+});
+
+test("a folder page with no schema of its own documents the _base component its platforms share", async () => {
+  const items = {
+    key: "Required",
+    is_list: true,
+    type: "typed",
+    typed_key: "type",
+    types: {
+      label: { config_vars: { text: { key: "Optional" } } },
+      select: { config_vars: { immediate_edit: { key: "Optional" } } },
+    },
+  };
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["lcd_menu"]),
+      display_menu: { display_menu: { action: {} } },
+      display_menu_base: {
+        display_menu_base: {
+          schemas: {
+            DISPLAY_MENU_BASE_SCHEMA: schema({ active: { key: "Optional" } }),
+            MENU_TYPES: schema({ items }),
+          },
+        },
+      },
+    },
+    pages: {
+      "display_menu/index.mdx": [
+        "Menus.",
+        "## Configuration variables",
+        "- **active** (*Optional*, boolean): Start active.",
+        "## Menu Items",
+        "### Label",
+        "- **text** (*Optional*, string): The label text.",
+        "### Select",
+        "- **immediate_edit** (*Optional*, boolean): Edit at once.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const base = store.files.get("display_menu_base").display_menu_base.schemas;
+  assert.match(base.DISPLAY_MENU_BASE_SCHEMA.schema.config_vars.active.docs, /Start active/);
+  const types = base.MENU_TYPES.schema.config_vars.items.types;
+  assert.match(types.label.config_vars.text.docs, /label text/);
+  assert.match(types.select.config_vars.immediate_edit.docs, /at once/);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind !== "undocumented_key"),
+    [],
+  );
+});
+
+test("a code heading naming a key two levels down the page schema opens it", async () => {
+  const widget = (extra) => ({ key: "Optional", ...schema({ x: { key: "Optional" }, ...extra }) });
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["lvgl"]),
+      lvgl: {
+        lvgl: {
+          schemas: {
+            CONFIG_SCHEMA: schema({
+              widgets: {
+                key: "Optional",
+                ...schema({ arc: widget({ adjustable: { key: "Optional" } }), bar: widget({}) }),
+              },
+            }),
+          },
+        },
+      },
+    },
+    pages: {
+      "lvgl/widgets.mdx": [
+        "Widgets.",
+        "## Widgets",
+        "Each widget.",
+        "### `arc`",
+        "An arc.",
+        "**Configuration variables:**",
+        "- **adjustable** (*Optional*, boolean): Whether the knob moves.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const arc = store.files.get("lvgl").lvgl.schemas.CONFIG_SCHEMA.schema.config_vars.widgets.schema.config_vars.arc;
+  assert.match(arc.schema.config_vars.adjustable.docs, /knob moves/);
+  assert.deepEqual(
+    report.findings.filter((f) => ["unmatched_key", "orphan_option_list", "unroutable_section"].includes(f.kind)),
+    [],
+  );
+});
+
+test("a heading naming another component documents that component's options", async () => {
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["color"], { display: {} }),
+      display: { display: { schemas: { DISPLAY_SCHEMA: schema({ lambda: { key: "Optional" } }) } } },
+      color: { color: { schemas: { CONFIG_SCHEMA: schema({ red: { key: "Optional" }, hex: { key: "Optional" } }) } } },
+    },
+    pages: {
+      "display/index.mdx": [
+        "Displays.",
+        "## Configuration variables",
+        "- **lambda** (*Optional*, lambda): Drawing code.",
+        "## Drawing",
+        "### Color",
+        "Colors are declared with the color component.",
+        "Configuration variables:",
+        "- **red** (*Optional*, percentage): The red share.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  assert.match(store.files.get("color").color.schemas.CONFIG_SCHEMA.schema.config_vars.red.docs, /red share/);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind === "unmatched_key"),
+    [],
+  );
+});
+
+test("a heading naming several platforms of a hub covers their schemas together, until its parent ends", async () => {
+  const platform = (key) => ({ schemas: { CONFIG_SCHEMA: schema({ [key]: { key: "Optional" } }) } });
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["meter"], { sensor: {}, text_sensor: {}, binary_sensor: {} }),
+      sensor: { sensor: { schemas: {}, components: { meter: {} } } },
+      text_sensor: { text_sensor: { schemas: {}, components: { meter: {} } } },
+      binary_sensor: { binary_sensor: { schemas: {}, components: { meter: {} } } },
+      meter: {
+        meter: { schemas: { CONFIG_SCHEMA: schema({ patterns: { key: "Optional" } }) } },
+        "meter.sensor": platform("voltage"),
+        "meter.text_sensor": platform("serial"),
+        "meter.binary_sensor": platform("alarm"),
+      },
+    },
+    pages: {
+      "sensor/meter.mdx": [
+        "A meter.",
+        "## Platforms",
+        "### Sensor, Text Sensor, and Binary Sensor",
+        "- **voltage** (*Optional*): Volts.",
+        "- **serial** (*Optional*): The serial number.",
+        "- **alarm** (*Optional*): Alarm state.",
+        "## Advanced",
+        "- **patterns** (*Optional*): Custom patterns.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const file = store.files.get("meter");
+  assert.match(file["meter.sensor"].schemas.CONFIG_SCHEMA.schema.config_vars.voltage.docs, /Volts/);
+  assert.match(file["meter.text_sensor"].schemas.CONFIG_SCHEMA.schema.config_vars.serial.docs, /serial number/);
+  assert.match(file["meter.binary_sensor"].schemas.CONFIG_SCHEMA.schema.config_vars.alarm.docs, /Alarm state/);
+  assert.match(file.meter.schemas.CONFIG_SCHEMA.schema.config_vars.patterns.docs, /Custom patterns/);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind === "unmatched_key"),
+    [],
+  );
+});
+
+test("a heading ending in a platform name on a hub page is that platform's section", async () => {
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["knob"], { sensor: {} }),
+      sensor: { sensor: { schemas: {}, components: { knob: {} } } },
+      knob: {
+        knob: { schemas: { CONFIG_SCHEMA: schema({ address: { key: "Optional" } }) } },
+        "knob.sensor": { schemas: { CONFIG_SCHEMA: schema({ channel: { key: "Required" } }) } },
+      },
+    },
+    pages: {
+      "sensor/knob.mdx": [
+        "A knob.",
+        "## Component/Hub",
+        "### Configuration variables",
+        "- **address** (*Optional*, int): The address.",
+        "## Knob's position sensor",
+        "### Configuration variables",
+        "- **channel** (**Required**, int): The channel.",
+        "",
+      ].join("\n\n"),
+    },
+  });
+  assert.match(store.files.get("knob")["knob.sensor"].schemas.CONFIG_SCHEMA.schema.config_vars.channel.docs, /channel/);
+  assert.deepEqual(
+    report.findings.filter((f) => f.kind === "unmatched_key"),
+    [],
+  );
+});
+
+test("a key that is an enum or a mapping takes option bullets for the mapping and the rest for the enum", async () => {
+  const { store, report } = await walk({
+    schema: {
+      esphome: core(["foo"]),
+      foo: {
+        foo: {
+          schemas: {
+            CONFIG_SCHEMA: schema({
+              transform: {
+                key: "Optional",
+                type: "enum",
+                values: { disabled: null },
+                schema: { config_vars: { mirror_x: { key: "Required" }, swap_xy: { key: "Required" } } },
+              },
+            }),
+          },
+        },
+      },
+    },
+    pages: {
+      "foo.mdx": [
+        "Foo.",
+        "## Configuration variables",
+        [
+          "- **transform** (*Optional*): `disabled`, or a mapping:",
+          "  - `disabled`: No hardware transform.",
+          "  - **mirror_x** (**Required**, boolean): Mirror the x axis.",
+          "  - **swap_xy** (**Required**, boolean): Exchange the axes.",
+        ].join("\n"),
+        "",
+      ].join("\n\n"),
+    },
+  });
+  const transform = store.files.get("foo").foo.schemas.CONFIG_SCHEMA.schema.config_vars.transform;
+  assert.match(transform.values.disabled.docs, /No hardware/);
+  assert.match(transform.schema.config_vars.mirror_x.docs, /Mirror the x/);
+  assert.deepEqual(
+    report.findings.filter((f) => ["unknown_enum_value", "unmatched_key", "malformed_enum_bullet"].includes(f.kind)),
+    [],
+  );
+});
