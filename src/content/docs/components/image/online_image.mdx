@@ -82,6 +82,14 @@ Advanced options:
 
 - **buffer_size** (*Optional*, int): Explicitly specify the size of the buffer where the image chunks are being downloaded while decoding. The default value (65536) should be OK for most use cases, but you can try to reduce the size for slow connections, to avoid watchdog timeouts.
 
+  When the server gives the size of a JPEG image (the `Content-Length` header, which most servers send), the
+  image is decoded a row of blocks at a time as it downloads, and the buffer only has to hold the JPEG headers
+  (markers and metadata such as EXIF), usually a few KB. A smaller `buffer_size` then saves RAM. Photos from
+  cameras and phones can carry tens of KB of metadata; if the JPEG headers do not fit, a warning suggests a larger
+  `buffer_size`, and the buffer grows to hold the whole image, which is downloaded completely before it is decoded.
+  Without the size, a JPEG image is always downloaded completely before it is decoded, and `buffer_size` must be
+  large enough to hold the whole image.
+
 ## Automations
 
 - **on_download_finished** (*Optional*, [Automation](/automations)): An automation to perform when the image has been successfully downloaded.
