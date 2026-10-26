@@ -280,6 +280,10 @@ climate:
   - `yaw1f`: the `yag` byte layout with the frame timing and follow-up message of YAW1F remotes. Try it when a
     unit with a YAW1F remote ignores `yag`.
 
+- **use_fahrenheit** (*Optional*, boolean): Show the setpoint in Fahrenheit on the air conditioner's own display,
+  for every whole degree from 61 °F to 86 °F. This does not change the unit Home Assistant shows. Sent for every
+  model, but only tested with `yx1ff`. Defaults to `false`.
+
 ```yaml
 # Example configuration entry for climate only
 climate:
