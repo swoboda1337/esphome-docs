@@ -57,6 +57,13 @@ ld2450:
 - **id** (*Optional*, [ID](/guides/configuration-types#id)): Manually specify the ID for this [Ld2450](/components/sensor/ld2450/) component.
 - **uart_id** (*Optional*, [ID](/guides/configuration-types#id)): Manually specify the ID of the [UART Component](/components/uart) to use.
   Required if you have multiple UARTs configured.
+- **link_timeout** (*Optional*, [Time](/guides/configuration-types#time)): How long the radar can send no valid data
+  frame before the component reports that the link to the radar is lost. Range is `1s` to `1h`. Defaults to `5s`.
+  See [When the Radar Stops Sending](#when-the-radar-stops-sending).
+
+  A long value only delays the detection. It does not turn it off: after `1h` without a frame the link is still
+  reported lost.
+
 - **on_data** (*Optional*, [Automation](/automations)): An automation to perform
   after each report is received. All target values are guaranteed to be up-to-date and consistent.
 
@@ -76,6 +83,8 @@ binary_sensor:
       name: Moving Target
     has_still_target:
       name: Still Target
+    connected:
+      name: Radar Link
 ```
 
 ### Configuration variables
@@ -89,6 +98,11 @@ binary_sensor:
 
 - **has_still_target** (*Optional*): True if a still target is detected.
   All options from [Binary Sensor](/components/binary_sensor#config-binary_sensor).
+
+- **connected** (*Optional*): On while the radar sends valid data frames, off when the link to the radar is lost
+  (see [When the Radar Stops Sending](#when-the-radar-stops-sending)). It reads off from boot until the first valid
+  frame arrives. The device class is `connectivity` and the entity category is `diagnostic`. It has no default
+  filter. All options from [Binary Sensor](/components/binary_sensor#config-binary_sensor).
 
 - **polygon_zones** (*Optional*, list): Presence binary sensors for [polygon zones](#polygon-zones). Each polygon
   zone must have exactly one presence binary sensor, under the same `ld2450_id` as the zone.
@@ -572,6 +586,61 @@ select:
   only targets in the specified area, while `Filter` mode can be used to exclude an area from detection. All options
   from [Select](/components/select#config-select).
 
+## When the Radar Stops Sending
+
+The radar sends data frames about 10 times per second, also when nobody is in the room. Without frames, the component
+has nothing to publish, so its sensors would keep their last value. To avoid that, the component treats the link as
+lost when no valid frame has arrived for [link_timeout](#configuration-variables). A radar without power, a broken
+wire, or a radar that sends at a baud rate the ESP does not read causes this.
+
+On link loss the component logs one warning. The warning tells whether any bytes arrived and how many frames were
+invalid since the last valid frame. Bytes without valid frames point to a wrong baud rate. No bytes at all point to
+power or wiring. These entities then change:
+
+- These read `unknown`:
+  - The `has_target`, `has_moving_target` and `has_still_target` binary sensors, and the
+    [polygon zone](#polygon-zones) binary sensors.
+  - All target count sensors, including the zone counts.
+  - All sensors of `target_N`: `x`, `y`, `speed`, `angle`, `distance` and `resolution`.
+  - The `direction` and `xy` text sensors. They publish the text `unknown`, which Home Assistant shows as an unknown
+    state. `NA` still means that the radar sees no target.
+- The [connected](#ld2450-binary-sensors) binary sensor reads off.
+- These keep their last value, because they hold settings and not radar data: the switches, selects, numbers and
+  polygon text entities, and the `version` and `mac_address` text sensors.
+
+When the radar has sent no frame since boot, only the warning and the `connected` sensor change: the other entities
+have no value yet, so they already read `unknown`.
+
+On the first valid frame the link is back. The component logs one message, the `connected` sensor turns on and every
+entity publishes from that frame. An empty room reads off on that frame, without waiting for the
+[presence_timeout](#number).
+
+[Filters](/components/binary_sensor/#binary-sensor-filters) on the presence binary sensors are reset on link loss:
+output they still hold back, such as a pending `delayed_off`, is dropped, so the sensor stays `unknown`. The values
+after the link returns go through the filters again, so a filter such as `delayed_on` still delays them.
+
+The silence that the component causes itself does not count as a loss, for a few seconds:
+
+- at boot
+- after a restart with the restart button
+- after a factory reset
+- when Bluetooth is turned on or off
+- when the baud rate is changed
+- while the settings of the radar are read
+
+Commands that change the zones or the target mode do not silence the radar for long, so they get no such time.
+
+After a baud rate change the radar sends at a rate the ESP does not read, so the link is reported lost when this
+time has passed. It comes back after you set the same `baud_rate` in the [UART Component](/components/uart/)
+configuration and install it.
+
+When the radar is silent from boot, the link is reported lost later than `link_timeout` after boot, because the
+restart at boot and the reading of the settings get this time first.
+
+> [!NOTE]
+> The link is lost when frames stop. A radar that still sends valid frames but detects nothing is not a lost link.
+> In an empty room the presence sensors read off, and the `connected` sensor stays on.
+
 ## Example configuration
 
 Here is the complete example configuration for [Ld2450](/components/sensor/ld2450/).
@@ -605,6 +674,7 @@ uart:
 ld2450:
   id: ld2450_radar
   uart_id: uart_ld2450
+  link_timeout: 5s
 
 binary_sensor:
   - platform: ld2450
@@ -615,6 +685,8 @@ binary_sensor:
       name: Moving Target
     has_still_target:
       name: Still Target
+    connected:
+      name: Radar Link
     polygon_zones:
       - polygon_zone_id: couch_zone
         name: Couch Occupied
