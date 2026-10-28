@@ -208,26 +208,29 @@ sensor:
 
   - **x** (*Optional*, int): Distance in `millimeter (mm)` of the target from the `ld2450` sensor along the
 
-      X-axis (negative for left side of the sensor, positive for right side of the sensor). The `ld2450` module can
-      detect targets from -3000 to 3000 mm in `X` direction. All options from [Sensor](/components/sensor).
+      X-axis (negative for left side of the sensor, positive for right side of the sensor). The value is reported as
+      the radar sends it. Zones and [polygon zones](#polygon-zones) accept `X` from -4860 to 4860 mm.
+      All options from [Sensor](/components/sensor).
 
   - **y** (*Optional*, int): Distance in `millimeter (mm)` of the target from the `ld2450` sensor in the Y
 
-      direction (near/far). The `ld2450` module can detect targets from 0 to 6000 mm in `Y` direction.
-      All options from [Sensor](/components/sensor).
+      direction (near/far). The value is reported as the radar sends it. Zones and
+      [polygon zones](#polygon-zones) accept `Y` from 0 to 7560 mm. All options from
+      [Sensor](/components/sensor).
 
   - **speed** (*Optional*, int): Speed of the moving target in `mm/s`.
 
       All options from [Sensor](/components/sensor).
 
-  - **angle** (*Optional*, int): Angle of target in `degrees (°)` relative to the `ld2450` sensor.
+  - **angle** (*Optional*, float): Angle of the target in `degrees (°)`, with one decimal place.
 
-      All options from [Sensor](/components/sensor).
-
-  - **distance** (*Optional*, int): Distance in `millimeter (mm)` of the target from the `ld2450` sensor along
-
-      the X-axis (negative for left side of the sensor, positive for right side of the sensor). All options from
+      The angle is measured from the Y-axis, which points straight out from the `ld2450` sensor. It is positive for
+      targets on the left side of the sensor and negative for targets on the right side. All options from
       [Sensor](/components/sensor).
+
+  - **distance** (*Optional*, int): Straight-line distance in `millimeter (mm)` from the `ld2450` sensor to the
+
+      target, calculated from its X and Y coordinates. All options from [Sensor](/components/sensor).
 
   - **resolution** (*Optional*, int): The `ld2450` target detection range resolution in `millimeter (mm)`.
 
@@ -283,15 +286,14 @@ switch:
       name: "Multi Target Tracking"
 ```
 
-<span id="ld2450-engineering-mode"></span>
-
 ### Configuration variables
 
 - **ld2450_id** (*Optional*, [ID](/guides/configuration-types#id)): Manually specify the ID for the [Ld2450](/components/sensor/ld2450/) component if you are
   using multiple components.
 
-- **bluetooth** (*Optional*): Turn on/off the bluetooth adapter. Defaults to `true`. All options from
-  [Switch](/components/switch#config-switch).
+- **bluetooth** (*Optional*): Turn on/off the bluetooth adapter. The switch has no default: it shows the state
+  the radar reports at boot and after each change. When Bluetooth is turned on or off, the radar restarts. All options
+  from [Switch](/components/switch#config-switch).
 
 - **multi_target** (*Optional*): Turn on/off the Multi Target Tracking option. The initial state set based on the
   corresponding setting as read from LD2450 module at boot. All options from [Switch](/components/switch#config-switch).
@@ -340,8 +342,15 @@ number:
 
 - **ld2450_id** (*Optional*, [ID](/guides/configuration-types#id)): Manually specify the ID for the [Ld2450](/components/sensor/ld2450/) component.
 - **presence_timeout** (**Required**, int): The duration, in seconds, for which the
-  [presence states](#ld2450-binary-sensors) will persist even after the detection is cleared. Default is `5`
-  seconds. All options from [Number](/components/number#config-number).
+  [presence states](#ld2450-binary-sensors) will persist even after the detection is cleared. Range is 0 to 3600
+  seconds. The value is saved and restored after a reboot; if nothing is saved yet, it is `5` seconds. Without the
+  `ld2450` number platform, the duration is also `5` seconds. All options from [Number](/components/number#config-number).
+
+  With `0`, there is no hold: a presence state clears on the first radar frame without a target. The
+  `has_target`, `has_moving_target` and `has_still_target` binary sensors have a `settle`
+  [default filter](#ld2450-binary-sensors): it passes that change at once when the state was steady for its settle
+  time, and delays it only when the state changed within that time. [Polygon zone](#polygon-zones) binary sensors
+  have no filters, so they turn off on that frame.
 
 > [!NOTE]
 > The `presence_timeout` value applies *only* to the [presence binary sensor states](#ld2450-binary-sensors),
@@ -353,19 +362,19 @@ number:
   coordinates consist of `x1`, `y1` (near-left) to `x2`, `y2` (far-right) and are specified in
   **millimeters (mm)**.
 
-  - **x1** (**Required**, int): Start X coordinate of the zone along the X-axis. Range is from -3000 (far left) to 3000
+  - **x1** (**Required**, int): Start X coordinate of the zone along the X-axis. Range is from -4860 (far left) to 4860
 
       (far right). All options from [Number](/components/number#config-number).
 
-  - **y1** (**Required**, int): Start Y coordinate of the zone along the Y-axis. Range is 0 (closest) to 6000
+  - **y1** (**Required**, int): Start Y coordinate of the zone along the Y-axis. Range is 0 (closest) to 7560
 
       (furthest). All options from [Number](/components/number#config-number).
 
-  - **x2** (**Required**, int): End X coordinate of the zone along the X-axis. Range is from -3000 (far left) to 3000
+  - **x2** (**Required**, int): End X coordinate of the zone along the X-axis. Range is from -4860 (far left) to 4860
 
       (far right). All options from [Number](/components/number#config-number).
 
-  - **y2** (**Required**, int): End Y coordinate of the zone along the Y-axis. Range is 0 (closest) to 6000
+  - **y2** (**Required**, int): End Y coordinate of the zone along the Y-axis. Range is 0 (closest) to 7560
 
       (furthest). All options from [Number](/components/number#config-number).
 
@@ -434,13 +443,14 @@ The polygon is set at runtime through the zone's text entity, as `x,y` points in
 -1000,500;1000,500;1500,3000;-1500,3000
 ```
 
-- 3 to 23 points, in the radar's coordinates, the same as the target X/Y sensors. Spaces around numbers and a
-  trailing `;` are allowed.
+- 3 to 23 points, in the radar's coordinates, the same as the target X/Y sensors. X is from -4860 to 4860 and Y is
+  from 0 to 7560. Spaces around numbers and a trailing `;` are allowed.
 - An empty value disables the zone, and its presence binary sensor becomes unknown.
 - An invalid value, or one that can't be saved, is rejected and the previous polygon is kept.
 
-The polygon is saved and restored on boot. Presence is on while any target is inside the polygon, and stays on
-for [presence_timeout](#number) after the last target leaves it.
+The polygon is saved and restored on boot. On platforms that save to flash, an accepted polygon is written right
+away, without waiting for the next `flash_write_interval`. Presence is on while any target is inside the polygon,
+and stays on for [presence_timeout](#number) after the last target leaves it.
 
 > [!NOTE]
 > Polygons are checked against the raw coordinates reported by the radar, before any sensor filter, so a filter
@@ -494,7 +504,9 @@ text_sensor:
 - **version** (*Optional*): The `ld2450` firmware version.
   All options from [Text Sensor](/components/text_sensor#config-text_sensor).
 
-- **mac_address** (*Optional*): The `ld2450` Bluetooth MAC address.
+- **mac_address** (*Optional*): The `ld2450` Bluetooth MAC address, as the radar reports it. It reads `unknown`
+  when Bluetooth is off, also after you turn it off with the [bluetooth switch](#switch), or when the radar reports
+  an all-zero or all-`FF` address.
   All options from [Text Sensor](/components/text_sensor#config-text_sensor).
 
 - **target_N** (*Optional*): Targets (N = 1 to 3). A maximum of 3 targets can be detected: `target_1`, `target_2`,
@@ -540,14 +552,20 @@ select:
       name: "Zone Type"
 ```
 
-<span id="ld2450-light-function"></span>
-
 ### Configuration variables
 
 - **ld2450_id** (*Optional*, [ID](/guides/configuration-types#id)): Manually specify the ID for the [Ld2450](/components/sensor/ld2450/) component.
-- **baud_rate** (*Optional*): Control the UART serial port baud rate. Defaults to `256000`. Once changed, all sensors
-  will stop working until a fresh install with an updated [UART Component](/components/uart) configuration. All options from
-  [Select](/components/select#config-select).
+- **baud_rate** (*Optional*): Set the baud rate of the radar. Options are `9600`, `19200`, `38400`, `57600`,
+  `115200`, `230400`, `256000` and `460800`. The select shows the `baud_rate` set in the
+  [UART Component](/components/uart) configuration.
+
+  Picking an option sends the new rate to the radar and restarts it. It does not change the UART of the ESP, so the
+  sensors stop working until you set the same `baud_rate` in the UART configuration and install it.
+
+  Radar firmware `2.14.25112412` resets the radar to 9600 baud. If the sensors are silent on that firmware, set
+  `baud_rate: 9600` in the UART configuration and install it.
+
+  All options from [Select](/components/select#config-select).
 
 - **zone_type** (*Optional*): Control the zone detection modes. It can be set to `Disabled`, `Detection` or
   `Filter`. Selecting the `Disabled` option will disable zone area detection. `Detection` mode is used to detect
