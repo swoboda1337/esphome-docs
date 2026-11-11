@@ -106,7 +106,7 @@ esp32_ble_server:
 - **write** (*Optional*, boolean): If the characteristic should be writable. Defaults to `false`.
 - **broadcast** (*Optional*, boolean): If the characteristic should be broadcast. Defaults to `false`.
 - **notify** (*Optional*, boolean): If the characteristic supports notifications. If `true`, a `CCCD` descriptor will be automatically added to the characteristic. Defaults to `false`.
-- **indicate** (*Optional*, boolean): If the characteristic supports indications. If `true`, a `CCCD` descriptor will be automatically added to the characteristic. Defaults to `false`.
+- **indicate** (*Optional*, boolean): If the characteristic supports indications. If `true`, a `CCCD` descriptor will be automatically added to the characteristic. Indications are currently sent as notifications, see the [`ble_server.characteristic.notify` Action](#ble_server-characteristic-notify-action). Defaults to `false`.
 - **write_no_response** (*Optional*, boolean): If the characteristic should be writable without a response. Defaults to `false`.
 - **value** (*Optional*, [Value Configuration](#esp32_ble_server-value)): The value of the characteristic.
 - **descriptors** (*Optional*, list of [Descriptor Configuration](#esp32_ble_server-descriptor)): A list of descriptors to expose in this characteristic.
@@ -234,6 +234,14 @@ on_...:
 ### Configuration variables
 
 - **id** (**Required**, string): The ID of the characteristic to notify the client about (must have the `notify` property).
+
+> [!NOTE]
+> Indications are not fully supported yet. There is no separate action to send an indication, and a client that
+> subscribes to indications is sent a notification instead: the client is not asked to confirm that it received
+> the value, and a warning is logged each time.
+>
+> This action requires the `notify` property, so a characteristic that only has the `indicate` property can only
+> be sent by calling `notify()` on it in a [lambda](/automations/templates/#config-lambda).
 
 <span id="esp32_ble_server-descriptor-set_value"></span>
 
